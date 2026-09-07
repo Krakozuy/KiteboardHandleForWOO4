@@ -3,6 +3,9 @@
 *.zip
 *.stl
 *.f3d
+*.step
+*.stp
+.vscode/
 build_report.json
 __pycache__/
 *.pyc
