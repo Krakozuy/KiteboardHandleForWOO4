@@ -1,0 +1,8 @@
+# Архивы выпусков и промежуточные файлы; исходники хранятся в outputs/KiteHandleWoo.
+/work/
+*.zip
+*.stl
+*.f3d
+build_report.json
+__pycache__/
+*.pyc
