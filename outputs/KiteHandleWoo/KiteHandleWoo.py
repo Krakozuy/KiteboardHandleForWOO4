@@ -17,7 +17,7 @@ API хранит координаты в см: перевод выполняет
 """
 
 # ==================== SETTINGS / НАСТРОЙКИ ====================
-scriptVersion = '1.0.19'       # Версия повышается при каждом обновлении.
+scriptVersion = '1.0.20'       # Версия повышается при каждом обновлении.
 fitGap = 0.20  # Общий посадочный зазор НА СТОРОНУ, мм.
 boltSpacing = 180.0  # Межцентровое расстояние крепёжных болтов по X.
 handleTop = 72.0  # Полная высота от поверхности доски.
@@ -48,6 +48,8 @@ wooHalfDepth = 11.0  # Половина полезной глубины: пол�
 wooProfileOffset = 1.0  # Расширение исходного контура наружу в плоскости XZ.
 wooZOffset = 0.0  # Сдвиг полости по Z относительно центра перекладины.
 wooFitClearance = 0.0  # Дополнительный припуск к профилю ПОСЛЕ wooProfileOffset.
+enableDrainHole = True  # Слив из камеры WOO вниз через хват; False отключает отверстие.
+drainHoleD = 1.5  # Диаметр сливного отверстия, мм; центр X=0, Y=0, направление вдоль Z.
 
 lidBorder = 1.15  # Ширина бортика вокруг полости в плоскости XZ.
 lidGap = fitGap  # Зазор по контуру крышки на сторону.
@@ -522,6 +524,10 @@ def validate(info, vertices):
     check(headPocketD/2+shoulder*math.tan(phi)+minimumWall < foot_width/2,
           'Head pocket leaves too little material at the shoulder on the inclined leg.')
     check(gripD/2-wooHalfDepth >= minimumWall,'WOO leaves insufficient side wall.')
+    if enableDrainHole:
+        # Канал должен целиком входить в центральную часть камеры.
+        check(0 < drainHoleD < min(2*wooHalfDepth,wooTopFlat),
+              'Диаметр слива должен быть положительным и меньше ширины и глубины камеры WOO.')
     check(abs(wooZOffset)+info['height_mm']/2+wooFitClearance+lidBorder+lidGap < gripH/2,'Cover seat does not fit grip height.')
     check(lidGap > 0 and lidBorder > lidGap and lidSeatDepth > lidAxialGap,'Invalid lid seat/gap.')
     if enableSnapFits:
@@ -749,6 +755,17 @@ def run(context):
         # Open to +Y; cover closes it at Y=+wooHalfDepth.
         handle = cut(comp,handle,prism_xz(comp,cavity_curves,-wooHalfDepth,gripD,'WOO_opening'))
         zc = handleTop-gripH/2+wooZOffset
+        if enableDrainHole:
+            stage = 'WOO drain hole'
+            # Вертикальный канал по центру: от точки ниже нижней грани хвата
+            # до середины пустой камеры. Верхняя стенка камеры не затрагивается.
+            drain = cylinder(comp,0,0,handleTop-gripH-baseTrimMargin,zc,
+                             drainHoleD,'WOO_drain_hole')
+            handle = cut(comp,handle,drain)
+        report['drain_hole'] = {'enabled':enableDrainHole,
+                                'diameter_mm':drainHoleD if enableDrainHole else None,
+                                'center_xy_mm':[0,0],'direction':'-Z'}
+        stage = 'WOO cavity and cover seat'
         xmax = max(abs(x) for x,z in vertices)+wooFitClearance
         wing_start,wing_end = wooTopFlat/2, xmax+lidWingLength
         seat_y = wooHalfDepth-lidSeatDepth
