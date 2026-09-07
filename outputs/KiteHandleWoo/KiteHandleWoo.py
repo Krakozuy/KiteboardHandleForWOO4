@@ -6,7 +6,7 @@ The design is rebuilt from Python settings (direct solid modelling).
 """
 
 # ==================== SETTINGS / НАСТРОЙКИ ====================
-scriptVersion = '1.0.11'       # Incremented with each published update.
+scriptVersion = '1.0.12'       # Incremented with each published update.
 boltSpacing = 180.0
 handleTop = 72.0
 gripH = 28.0                  # Uniform section, normal to path, INCLUDING legs.
@@ -551,11 +551,17 @@ def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y):
     pocket = prism_xy(comp,offset_polygon(tongue_xy,tongueClearance),
                       zc-tongueWidth/2-tongueClearance,zc+tongueWidth/2+tongueClearance,'Gusseted_tongue_pocket')
     handle = cut(comp,handle,pocket)
-    # Relieve only the left pivot edge. This is intentional room for the
-    # cover thickness to swing past the seat while the right end is lifted.
-    pivot_half_h = lidWingH/2+wooFitClearance+lidBorder+lidGap
-    pivot = box(comp,left_edge-lidTiltClearance,left_edge+lidTiltClearance,
-                seat_y,gripD,zc-pivot_half_h,zc+pivot_half_h,'Lid_pivot_clearance')
+    # Follow the SAME rounded wing contour as the cover, with clearance.
+    # A rectangular strip here used to leave square ears beyond the corners.
+    # Retain opening room by offsetting the rounded outline instead.
+    pivot_offset = wooFitClearance+lidBorder+max(lidGap,lidTiltClearance)
+    pivot_half_h = lidWingH/2+pivot_offset
+    pivot_left = -wing_end-pivot_offset
+    pivot_right = -wooTopFlat/2+pivot_offset
+    pivot_vertices = [(pivot_left,zc-pivot_half_h),(pivot_right,zc-pivot_half_h),
+                      (pivot_right,zc+pivot_half_h),(pivot_left,zc+pivot_half_h)]
+    pivot_curves = rounded_polygon(pivot_vertices,[lidWingR+pivot_offset]*4)
+    pivot = prism_xz(comp,pivot_curves,seat_y,gripD,'Rounded_lid_pivot_clearance')
     handle = cut(comp,handle,pivot)
     return handle,cover,{'sample_center_x':(root_left+end_x)/2,
                          'sample_min_y':min(beam_front,tongue_front)-snapClearance,
