@@ -6,7 +6,7 @@ The design is rebuilt from Python settings (direct solid modelling).
 """
 
 # ==================== SETTINGS / НАСТРОЙКИ ====================
-scriptVersion = '1.0.12'       # Incremented with each published update.
+scriptVersion = '1.0.13'       # Incremented with each published update.
 boltSpacing = 180.0
 handleTop = 72.0
 gripH = 28.0                  # Uniform section, normal to path, INCLUDING legs.
@@ -60,11 +60,13 @@ snapUpperGap = 0.65            # Upper U-slot gap.
 snapTipGap = 0.65              # Free-end U-slot gap.
 snapEdgeRail = 1.0             # Cover strip outside upper slot, opened at hook.
 mechanismKeepout = 0.8         # Separation from maximum WOO profile width.
-tongueEngagement = 2.0         # LEFT tongue extends under the handle lip.
-tongueThickness = 1.8
+tongueEngagement = 1.2         # Short tuck-in engagement; rigid tongue, not a snap.
+tongueThickness = 1.6
+tongueTipThickness = 0.8       # Thin leading tip with a second insertion bevel.
 tongueWidth = 5.0
 tongueRootLength = 3.0
-tongueClearance = 0.35
+tongueClearance = 0.25         # Nominal clearance per side in the tongue pocket.
+tongueMotionSteps = 12         # Construction samples for the pocket's motion envelope.
 lidTiltAngle = 5.0             # Planned opening angle, degrees.
 lidTiltClearance = 0.6         # Extra opening clearance at the left pivot edge.
 pryD = 2.5                    # Recess at wing edge to lift the cover.
@@ -141,6 +143,45 @@ def rounded_polygon(vertices, radii):
             result.append((c[0], c[1], c[2]))
         result.append((c[2], nxt[0]))
     return result
+
+
+def convex_hull(points):
+    """CCW supporting polygon for a set of 2D construction points."""
+    points = sorted(set(points))
+    def cross(a,b,c):
+        return (b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0])
+    lower,upper = [],[]
+    for point in points:
+        while len(lower) >= 2 and cross(lower[-2],lower[-1],point) <= 0:
+            lower.pop()
+        lower.append(point)
+    for point in reversed(points):
+        while len(upper) >= 2 and cross(upper[-2],upper[-1],point) <= 0:
+            upper.pop()
+        upper.append(point)
+    return lower[:-1]+upper[:-1]
+
+
+def tongue_pocket_outline(tongue_xy,pivot_x,pivot_y):
+    """Clear the tongue's tilt-then-slide route, not just its closed pose.
+    The opposite lid edge is lifted first; the tongue then slides out in +X.
+    A small analytical sagitta allowance encloses arcs between sampled poses.
+    This builds geometry; it is not a simulation of the full lid assembly.
+    """
+    angle = math.radians(lidTiltAngle)
+    points = list(tongue_xy)
+    travel = tongueEngagement+tongueClearance
+    for i in range(tongueMotionSteps+1):
+        a = angle*i/tongueMotionSteps
+        ca,sa = math.cos(a),math.sin(a)
+        pose = [(pivot_x+(x-pivot_x)*ca-(y-pivot_y)*sa,
+                 pivot_y+(x-pivot_x)*sa+(y-pivot_y)*ca) for x,y in tongue_xy]
+        points.extend(pose)
+        if i == tongueMotionSteps:
+            points.extend((x+travel,y) for x,y in pose)
+    radius = max(math.hypot(x-pivot_x,y-pivot_y) for x,y in tongue_xy)
+    allowance = radius*(1-math.cos(angle/(2*tongueMotionSteps)))
+    return offset_polygon(convex_hull(points),tongueClearance+allowance)
 
 
 def offset_polygon(vertices, distance):
@@ -447,6 +488,10 @@ def validate(info, vertices):
               'Edge catch reaches the curved outer skin; reduce lidWingH or hook size.')
         check(tongueRootLength > 0 and tongueThickness > 0 and
               tongueEngagement > 0 and tongueClearance > 0,'Invalid rigid tongue.')
+        check(0 < tongueTipThickness < tongueThickness,
+              'Tongue tip must be thinner than the root.')
+        check(isinstance(tongueMotionSteps,int) and tongueMotionSteps >= 4,
+              'tongueMotionSteps must be an integer >= 4.')
         check(0 < lidTiltAngle < 15,'Use a small lid opening angle.')
         angle = math.radians(lidTiltAngle)
         check(lidTiltClearance+lidGap > (gripD/2-wooHalfDepth+lidSeatDepth+tongueClearance)*math.sin(angle),
@@ -541,14 +586,16 @@ def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y):
     left_edge = -(wing_end+wooFitClearance+lidBorder)
     tongue_front = seat_y-tongueClearance-tongueThickness
     tongue_back = seat_y-tongueClearance
-    tongue_xy = [(left_edge-tongueEngagement,tongue_front),
+    tongue_xy = [(left_edge-tongueEngagement,tongue_back-tongueTipThickness),
+                 (left_edge,tongue_front),
                  (left_edge+tongueRootLength,tongue_front),
                  (left_edge+tongueRootLength,tongue_back+tongueEngagement),
                  (left_edge,tongue_back+tongueEngagement),
                  (left_edge-tongueEngagement,tongue_back)]
     tongue = prism_xy(comp,tongue_xy,zc-tongueWidth/2,zc+tongueWidth/2,'Gusseted_left_tongue')
     cover = join(comp,cover,tongue)
-    pocket = prism_xy(comp,offset_polygon(tongue_xy,tongueClearance),
+    pocket_outline = tongue_pocket_outline(tongue_xy,left_edge,tongue_back)
+    pocket = prism_xy(comp,pocket_outline,
                       zc-tongueWidth/2-tongueClearance,zc+tongueWidth/2+tongueClearance,'Gusseted_tongue_pocket')
     handle = cut(comp,handle,pocket)
     # Follow the SAME rounded wing contour as the cover, with clearance.
