@@ -17,7 +17,7 @@ API хранит координаты в см: перевод выполняет
 """
 
 # ==================== SETTINGS / НАСТРОЙКИ ====================
-scriptVersion = '1.0.17'       # Версия повышается при каждом обновлении.
+scriptVersion = '1.0.18'       # Версия повышается при каждом обновлении.
 fitGap = 0.1  # Общий посадочный зазор НА СТОРОНУ, мм.
 boltSpacing = 180.0  # Межцентровое расстояние крепёжных болтов по X.
 handleTop = 72.0  # Полная высота от поверхности доски.
@@ -68,9 +68,9 @@ snapRamp = 1.0  # Длина каждого скоса зуба для пост�
 snapTipLand = 0.4  # Плоский участок на вершине зуба.
 snapClearance = fitGap  # Посадочный зазор ответного паза зуба.
 snapFlexSpace = 0.85  # Место для отжима под язычком; рабочий ход, не зазор посадки.
-snapUpperGap = fitGap  # Ширина верхней ветви П-образного сквозного паза.
+snapUpperGap = snapFlexSpace  # Верхний зазор по Z равен нижнему: 0.85 мм.
 snapTipGap = fitGap  # Зазор у свободного торца язычка.
-snapEdgeRail = 1.0  # Полоса крышки снаружи верхнего паза; у зуба она раскрывается.
+snapEdgeRail = 2.0  # Толщина полосы крышки над пазом по Z; у зуба она раскрывается.
 mechanismKeepout = 0.8  # Отступ крепления от максимальной ширины полости WOO.
 tongueEngagement = 1.2  # Глубина захода жёсткого левого язычка в карман.
 tongueThickness = 1.6  # Толщина жёсткого язычка по Y у основания.
@@ -599,6 +599,8 @@ def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y):
     root_x = root_left+snapRootLength
     end_x = root_x+snapLength
     edge_z = zc+lidWingH/2+wooFitClearance+lidBorder
+    # Край крышки остаётся на месте. Утолщение верхней полосы и увеличение
+    # зазора опускают всю балку: в v1.0.18 на 1.75 мм относительно v1.0.17.
     beam_top = edge_z-snapEdgeRail-snapUpperGap
     root_bottom = beam_top-snapRootThickness
     tip_bottom = beam_top-snapThickness
@@ -636,6 +638,9 @@ def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y):
     # avoiding a horizontal shelf when printed with the outer face down.
     base_z = edge_z-snapClearance
     peak_z = edge_z+lidGap+snapHook
+    # Основание штыря следует за опущенной балкой, вершина остаётся у посадки.
+    # Поэтому штырь автоматически удлиняется, сохраняя глубину зацепления
+    # snapHook и прежние скосы. Ответный паз ниже строится по этому же профилю.
     nose_y = outer_y-2*snapRamp-snapTipLand
     hook_profile = [(nose_y,beam_top-snapClearance),(outer_y,beam_top-snapClearance),
                     (outer_y,base_z),(outer_y-snapRamp,peak_z),
@@ -680,6 +685,11 @@ def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y):
                          'sample_min_y':min(beam_front,tongue_front)-snapClearance,
                          'free_beam_length_mm':snapLength,
                          'beam_depth_mm':snapWidth,
+                         'upper_slot_gap_z_mm':snapUpperGap,
+                         'lower_slot_gap_z_mm':snapFlexSpace,
+                         'upper_cover_rail_z_mm':snapEdgeRail,
+                         'beam_top_z_mm':beam_top,
+                         'hook_rise_from_beam_mm':peak_z-beam_top,
                          'print_face_y_mm':outer_y,
                          'slot_type':'Through U-slot; integral beam; open edge hook',
                          'release_direction':'-Z; lift right edge toward +Y, then slide +X',
