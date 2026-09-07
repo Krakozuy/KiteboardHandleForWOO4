@@ -6,7 +6,7 @@ The design is rebuilt from Python settings (direct solid modelling).
 """
 
 # ==================== SETTINGS / НАСТРОЙКИ ====================
-scriptVersion = '1.0.15'       # Incremented with each published update.
+scriptVersion = '1.0.16'       # Incremented with each published update.
 fitGap = 0.1                  # Shared nominal fitting clearance, mm PER SIDE.
 boltSpacing = 180.0
 handleTop = 72.0
@@ -19,7 +19,7 @@ shoulder = 4.0                 # Material beneath bolt head, measured from board
 
 gripR = 6.0                    # Same section radius for legs, bends and grip.
 printFriendlySection = True   # Symmetric 45-degree slopes on BOTH Y faces.
-sectionChamfer = 6.0          # Setback of 45-degree slopes, mm; same on both sides.
+sectionChamfer = 3.0          # Reduced symmetrically to keep walls around enlarged WOO.
 bendR = 17.0                   # Centre-line radius of the two upper bends.
 baseTrimMargin = 1.0           # Extra stock below board before trimming at Z=0.
 
@@ -34,6 +34,7 @@ wooSideR = 1.0
 wooBottomR = 0.5
 wooSideChordReference = 0.960  # Rounded reference dimension, checked in report.
 wooHalfDepth = 11.0            # Empty cavity Y=-11..+11, including under cover.
+wooProfileOffset = 3.0        # True outward offset of the drawing contour in XZ.
 wooZOffset = 0.0              # Offset from middle height of grip.
 wooFitClearance = 0.0          # Optional outward profile clearance; 0 = drawing.
 
@@ -236,7 +237,16 @@ def woo_geometry():
     zbase = handleTop-gripH/2+wooZOffset-height/2
     verts = [(x,z+zbase) for x,z in verts]
     radii = [wooBottomR,wooBottomR,wooSideR,wooTopR,wooTopR,wooSideR]
-    return verts, radii, {'height_mm':height, 'alpha_deg':math.degrees(alpha),
+    # Offset the supporting lines AND increase arc radii by the same amount.
+    # This is an equidistant contour, not scaling or adding to individual widths.
+    # Apply before lid/seat construction so their central contours follow WOO,
+    # while the side-wing cross-sections and fitting gaps remain independent.
+    check(wooProfileOffset >= 0,'wooProfileOffset must be non-negative.')
+    verts = offset_polygon(verts,wooProfileOffset)
+    radii = [r+wooProfileOffset for r in radii]
+    return verts, radii, {'height_mm':height+2*wooProfileOffset,
+                         'drawing_height_mm':height, 'profile_offset_mm':wooProfileOffset,
+                         'alpha_deg':math.degrees(alpha),
                          'beta_deg':math.degrees(beta),
                          'side_chord_mm':2*wooSideR*math.sin((beta-alpha)/2)}
 
