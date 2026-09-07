@@ -17,7 +17,7 @@ API хранит координаты в см: перевод выполняет
 """
 
 # ==================== SETTINGS / НАСТРОЙКИ ====================
-scriptVersion = '1.0.22'       # Версия повышается при каждом обновлении.
+scriptVersion = '1.0.23'       # Версия повышается при каждом обновлении.
 fitGap = 0.20  # Общий посадочный зазор НА СТОРОНУ, мм.
 boltSpacing = 180.0  # Межцентровое расстояние крепёжных болтов по X.
 handleTop = 72.0  # Полная высота от поверхности доски.
@@ -27,6 +27,15 @@ legLean = 20.0  # Смещение верхнего конца прямой но
 boltD = 6.6  # Диаметр сквозного отверстия под M6.
 headPocketD = 13.0  # Диаметр доступа к головке болта.
 shoulder = 4.0  # Толщина опоры под головкой от поверхности доски.
+
+# TPU-проставки: верх основания совпадает с подошвой ASA на Z=0.
+enableFootPads = True  # Создать две проставки и ответные пазы в ножках.
+padThickness = 3.0  # Толщина основания вниз от подошвы; не включает выступы.
+padKeyHeight = 2.0  # Высота выступов над верхней плоскостью проставки.
+padKeyLength = 15.0  # Длина каждого выступа вдоль X, длинного края подошвы.
+padKeyWidth = 2.5  # Ширина каждого выступа по Y.
+padKeyEdgeInset = 3.5  # От края подошвы до ближайшей длинной стороны выступа.
+padKeyClearance = 0.2  # Зазор ответного паза на каждую сторону и над выступом.
 
 gripR = 6.0  # Радиус сечения ножек, изгибов и перекладины.
 printFriendlySection = True  # Симметричные скосы 45 градусов с обеих сторон по Y.
@@ -526,6 +535,15 @@ def validate(info, vertices):
     check(headPocketD/2+shoulder*math.tan(phi)+minimumWall < foot_width/2,
           'Head pocket leaves too little material at the shoulder on the inclined leg.')
     check(gripD/2-wooHalfDepth >= minimumWall,'WOO leaves insufficient side wall.')
+    if enableFootPads:
+        check(min(padThickness,padKeyHeight,padKeyLength,padKeyWidth,
+                  padKeyEdgeInset,padKeyClearance) > 0,'Размеры TPU-проставок должны быть положительными.')
+        check(padKeyHeight+padKeyClearance+minimumWall <= shoulder,
+              'Пазы проставок слишком глубокие относительно опоры головки болта.')
+        check(padKeyLength+2*padKeyClearance < foot_width,
+              'Выступы проставки слишком длинные для подошвы.')
+        check(gripD/2-padKeyEdgeInset-padKeyWidth-padKeyClearance > boltD/2,
+              'Выступы проставки или их пазы достигают отверстия M6.')
     if enableDrainHole:
         # Канал должен целиком входить в центральную часть камеры.
         check(0 < drainHoleD < min(2*wooHalfDepth,wooTopFlat),
@@ -726,8 +744,72 @@ def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y):
                          'planned_opening_angle_deg':lidTiltAngle}
 
 
-# ОТЧЁТ.
-# Получить связность, объём в мм3 и границы тела в мм.
+# TPU-ПРОСТАВКИ. Копируем именно плоский торец ножки после обрезки на Z=0.
+# Его скругления при наклоне не равны обычному прямоугольнику с радиусами.
+def make_foot_pads(comp, handle):
+    tbm = adsk.fusion.TemporaryBRepManager.get()
+    feet = []
+    for face in handle.faces:
+        bounds = face.boundingBox
+        if (abs(bounds.minPoint.z*10) < geometryTolerance and
+                abs(bounds.maxPoint.z*10) < geometryTolerance and
+                adsk.core.Plane.cast(face.geometry) is not None):
+            feet.append(face)
+    check(len(feet) == 2,'Ожидались две плоские подошвы ножек на Z=0.')
+    feet.sort(key=lambda face: face.boundingBox.minPoint.x)
+    pads = []
+    pockets = []
+    # Сначала спроецировать обе подошвы. Вырезы в ASA делаются позже,
+    # чтобы изменение топологии не сделало ссылки на исходные грани невалидными.
+    for face, sign, label in zip(feet,[-1,1],['Left','Right']):
+        bounds = face.boundingBox
+        x_center = sign*boltSpacing/2
+        y_min, y_max = bounds.minPoint.y*10, bounds.maxPoint.y*10
+        outer = [loop for loop in face.loops if loop.isOuter]
+        check(len(outer) == 1,'У подошвы должен быть один внешний контур.')
+        sk = sketch_plane(comp,(0,0,0),(0,0,1),'TPU_'+label+'_exact_footprint')
+        # Несвязанные проекции сохраняют точные линии/дуги/кривые торца.
+        # Не проецируем отверстия: M6 вырезается по той же оси и диаметру,
+        # что и отверстие ножки, после создания сплошного основания проставки.
+        sk.isComputeDeferred = True
+        try:
+            edges = [edge for edge in outer[0].edges]
+            sk.project2(edges,False)
+        finally:
+            sk.isComputeDeferred = False
+        check(sk.profiles.count == 1,'Не удалось получить замкнутый внешний контур подошвы.')
+        pad = extrude(comp,sk.profiles.item(0),-padThickness,'TPU_Pad_'+label)
+        sk.isVisible = False
+        pad = cut(comp,pad,cylinder(comp,x_center,0,-padThickness-geometryTolerance,
+                                   geometryTolerance,boltD,'TPU_'+label+'_M6'))
+        key_centers = [y_min+padKeyEdgeInset+padKeyWidth/2,
+                       y_max-padKeyEdgeInset-padKeyWidth/2]
+        for index, yc in enumerate(key_centers,1):
+            xa, xb = x_center-padKeyLength/2, x_center+padKeyLength/2
+            ya, yb = yc-padKeyWidth/2, yc+padKeyWidth/2
+            # Небольшое перекрытие внутрь основания обеспечивает надёжное Join.
+            # Над Z=0 высота остаётся точно padKeyHeight.
+            key = box(comp,xa,xb,ya,yb,-min(geometryTolerance,padThickness/2),
+                      padKeyHeight,'TPU_'+label+'_Key_'+str(index))
+            pad = join(comp,pad,key)
+            gap = padKeyClearance
+            pocket = box(comp,xa-gap,xb+gap,ya-gap,yb+gap,0,padKeyHeight+gap,
+                         'ASA_'+label+'_Key_pocket_'+str(index))
+            # Проверка при запуске: весь паз внутри ножки, без выхода в боковую
+            # стенку, скругление или болтовой канал. Объёмы API выражены в см³.
+            inside = tbm.copy(pocket)
+            ok = tbm.booleanOperation(inside,tbm.copy(handle),
+                                     adsk.fusion.BooleanTypes.IntersectionBooleanType)
+            check(ok and abs(inside.volume-pocket.volume) < 1e-7,
+                  'Паз TPU-проставки выходит за материал ножки; скорректируйте отступ или длину выступа.')
+            pockets.append(pocket)
+        pad.name = 'TPU_Pad_'+label
+        pads.append(pad)
+    for pocket in pockets:
+        handle = cut(comp,handle,pocket)
+    return handle,pads
+
+# ОТЧЁТ. Получить связность, объём в мм3 и границы тела в мм.
 def report_body(body):
     bb = body.boundingBox
     return {'solid':body.isSolid,'lumps':body.lumps.count,'volume_mm3':body.volume*1000,
@@ -818,6 +900,10 @@ def run(context):
                       ((pry_x,zc+radius),(pry_x,zc-radius))]
         pry = prism_xz(comp,pry_curves,seat_y-pryDepth,gripD,'Finger_semicircle_recess')
         handle = cut(comp,handle,pry)
+        pad_bodies = []
+        if enableFootPads:
+            stage = 'TPU foot pads and matching pockets'
+            handle,pad_bodies = make_foot_pads(comp,handle)
         handle.name = 'Handle'
         cover.name = 'Cover'
         stage = 'Check solids and assembled clearances'
@@ -825,7 +911,9 @@ def run(context):
         # Проверяется закрытая сборка, а не вся траектория установки и снятия.
         report['handle'] = report_body(handle)
         report['cover'] = report_body(cover)
-        for body in [handle,cover]:
+        report['foot_pads'] = [report_body(pad) for pad in pad_bodies]
+        report['assembly_height_mm'] = handleTop+(padThickness if enableFootPads else 0)
+        for body in [handle,cover]+pad_bodies:
             check(body.isSolid and body.lumps.count == 1,'Expected one connected solid per part.')
         check(abs(handle.boundingBox.maxPoint.z*10-handleTop) < geometryTolerance,'Overall height differs from handleTop.')
         check(abs(handle.boundingBox.minPoint.z*10) < geometryTolerance,'Feet do not lie at Z=0.')
@@ -835,6 +923,13 @@ def run(context):
         check(ok,'Could not verify cover interference.')
         report['overlap_mm3'] = overlap.volume*1000
         check(overlap.volume < 0.00001,'Cover interferes with handle; check catch relief.')
+        for pad in pad_bodies:
+            overlap = tbm.copy(handle)
+            ok = tbm.booleanOperation(overlap,tbm.copy(pad),
+                                      adsk.fusion.BooleanTypes.IntersectionBooleanType)
+            check(ok and overlap.volume < 0.00001,'TPU-проставка пересекается с материалом ножки.')
+            check(abs(pad.boundingBox.minPoint.z*10+padThickness) < geometryTolerance,
+                  'Неверная толщина основания TPU-проставки.')
         # 10. При необходимости выделить образцы крепления для пробной печати.
         if makeFitSample and enableSnapFits:
             stage = 'Fit sample'
@@ -855,7 +950,16 @@ def run(context):
         cover_occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
         cover_occ.component.name = 'Cover'
         cover = cover.moveToComponent(cover_occ)
-        for component in [comp,cover_occ.component]:
+        # Каждая TPU-проставка — отдельное тело в отдельном компоненте.
+        # Перенос не меняет положение сборки: низ TPU на Z=-padThickness.
+        pad_components = []
+        for pad in pad_bodies:
+            pad_name = pad.name
+            pad_occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+            pad_occ.component.name = pad_name
+            pad.moveToComponent(pad_occ)
+            pad_components.append((pad_occ.component,pad_name))
+        for component in [comp,cover_occ.component]+[c for c,n in pad_components]:
             for sk in component.sketches:
                 sk.isVisible = False
             for plane in component.constructionPlanes:
@@ -864,7 +968,7 @@ def run(context):
         # 12. Сохранить отдельные STL и общую модель F3D рядом со скриптом.
         if exportFiles:
             manager = design.exportManager
-            for component,name in [(comp,'Handle'),(cover_occ.component,'Cover')]:
+            for component,name in [(comp,'Handle'),(cover_occ.component,'Cover')]+pad_components:
                 opt = manager.createSTLExportOptions(component,os.path.join(folder,name+'.stl'))
                 opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
                 check(manager.execute(opt),'STL export failed: '+name)
@@ -888,6 +992,7 @@ def run(context):
                  'Снятие: подцепить край в полукруглой выемке, поднять к +Y и сдвинуть крышку к +X.\n'
                  'Посадку и ход снятия проверьте пробной печатью.\n' if enableSnapFits
                  else 'Крышка без защёлок: сохранён посадочный бортик, фиксации нет.\n')+
+                ('TPU: две проставки, отдельные STL TPU_Pad_Left и TPU_Pad_Right.\n' if enableFootPads else '')+
                 'STL/F3D и отчёт: '+folder,modelName+' v'+scriptVersion)
     except Exception:
         # Сохранить этап и полный traceback, чтобы найти причину сбоя.
