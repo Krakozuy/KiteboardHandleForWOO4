@@ -17,7 +17,7 @@ API хранит координаты в см: перевод выполняет
 """
 
 # ==================== SETTINGS / НАСТРОЙКИ ====================
-scriptVersion = '1.0.20'       # Версия повышается при каждом обновлении.
+scriptVersion = '1.0.21'       # Версия повышается при каждом обновлении.
 fitGap = 0.20  # Общий посадочный зазор НА СТОРОНУ, мм.
 boltSpacing = 180.0  # Межцентровое расстояние крепёжных болтов по X.
 handleTop = 72.0  # Полная высота от поверхности доски.
@@ -54,11 +54,11 @@ drainHoleD = 1.5  # Диаметр сливного отверстия, мм; ц
 lidBorder = 1.15  # Ширина бортика вокруг полости в плоскости XZ.
 lidGap = fitGap  # Зазор по контуру крышки на сторону.
 lidSeatDepth = 1.1  # Заглубление бортика относительно полезного объёма WOO.
-lidAxialGap = fitGap  # Зазор над посадкой по Y в закрытом положении.
+lidAxialGap = 0.1  # Уменьшенный зазор над посадкой по Y для снижения люфта крышки.
 lidWingLength = 16.0  # Длина боковых участков для креплений за пределами полости.
 lidWingH = 11.0  # Высота боковых участков крышки по Z.
 lidWingR = 1.0  # Радиус углов боковых участков.
-enableSnapFits = True  # Добавить жёсткий язычок слева и отжимную защёлку справа.
+enableSnapFits = True  # Жёсткий язычок слева и две зеркальные защёлки справа.
 snapLength = 12.0  # Свободная длина упругого язычка вдоль X.
 snapThickness = 1.2  # Толщина свободного конца по Z; отжим к -Z.
 snapRootThickness = 1.8  # Толщина у корня; к свободному концу язычок сужается.
@@ -68,7 +68,7 @@ snapHook = 0.45  # Выступ зуба за край посадки в сто�
 snapHookLength = 2.5  # Длина зуба вдоль X у свободного конца.
 snapRamp = 1.0  # Длина каждого скоса зуба для постепенного нарастания при печати.
 snapTipLand = 0.4  # Плоский участок на вершине зуба.
-snapClearance = fitGap  # Посадочный зазор ответного паза зуба.
+snapClearance = 0.1  # Локальный зазор гнёзд зубьев; уменьшен для снижения люфта.
 snapFlexSpace = 0.85  # Место для отжима под язычком; рабочий ход, не зазор посадки.
 snapUpperGap = snapFlexSpace  # Верхний зазор по Z равен нижнему: 0.85 мм.
 snapTipGap = fitGap  # Зазор у свободного торца язычка.
@@ -83,7 +83,9 @@ tongueClearance = fitGap  # Зазор на сторону в кармане ж�
 tongueMotionSteps = 12  # Число положений для построения огибающей кармана при наклоне.
 lidTiltAngle = 2.0  # Расчётный угол наклона крышки при снятии, градусы.
 lidTiltClearance = fitGap  # Зазор у левого поворотного края крышки.
-pryD = 2.5  # Диаметр выемки для поддевания крышки.
+pryD = 10.0  # Диаметр полукруглой выемки под палец в плоскости крышки XZ.
+pryUnderlap = 0.8  # Насколько выемка заходит под торец крышки по X.
+pryDepth = 1.5  # Глубина выемки за посадкой по Y, чтобы подцепить край ногтем.
 minimumWall = 1.5  # Минимум для геометрических ограничений, не расчёт прочности.
 
 makeFitSample = False  # Создать отдельные фрагменты крепления для пробной печати.
@@ -530,6 +532,12 @@ def validate(info, vertices):
               'Диаметр слива должен быть положительным и меньше ширины и глубины камеры WOO.')
     check(abs(wooZOffset)+info['height_mm']/2+wooFitClearance+lidBorder+lidGap < gripH/2,'Cover seat does not fit grip height.')
     check(lidGap > 0 and lidBorder > lidGap and lidSeatDepth > lidAxialGap,'Invalid lid seat/gap.')
+    wing_half = lidWingH/2+wooFitClearance+lidBorder
+    check(0 < pryD/2 < wing_half-minimumWall,
+          'Выемка под палец слишком широкая: оставьте материал до верхнего и нижнего края.')
+    check(0 < pryDepth < wooHalfDepth-lidSeatDepth+gripD/2-minimumWall and
+          0 < pryUnderlap < lidWingLength,
+          'Недопустимая глубина выемки или заход под торец крышки.')
     if enableSnapFits:
         check(0 < snapClearance < snapHook < snapFlexSpace,'Invalid latch engagement/release travel.')
         check(snapRootThickness >= snapThickness > 0 and snapRootLength > snapFlexSpace/2,
@@ -548,6 +556,12 @@ def validate(info, vertices):
         wing_half = lidWingH/2+wooFitClearance+lidBorder
         check(wing_half-snapEdgeRail-snapUpperGap-snapRootThickness-snapFlexSpace
               > -wing_half+minimumWall,'U-slot leaves too little material below the beam.')
+        # Между зеркальными пазами должна остаться непрерывная центральная полоса.
+        check(2*(wing_half-snapEdgeRail-snapUpperGap-snapRootThickness-snapFlexSpace)
+              >= minimumWall,'Зеркальные пазы сближаются: увеличьте lidWingH или уменьшите размеры пазов.')
+        check(lidWingLength+wooFitClearance+lidBorder-pryUnderlap >
+              mechanismKeepout+snapRootLength+snapLength+snapClearance,
+              'Выемка под палец заходит в гнёзда защёлок: уменьшите pryUnderlap.')
         # All of the latch must start on the same flat outer print face.
         flat_half = gripH/2-(sectionChamfer if printFriendlySection else gripR)
         check(abs(wooZOffset)+wing_half+lidGap+snapHook+snapClearance < flat_half,
@@ -574,6 +588,8 @@ def validate(info, vertices):
     xmax = max(abs(x) for x,z in vertices)+wooFitClearance
     check(xmax+lidWingLength+lidGap+minimumWall < tangentx,
           'Bolt spacing too short: cover wings reach bends. Increase boltSpacing or reduce wings.')
+    check(xmax+lidWingLength+wooFitClearance+lidBorder-pryUnderlap+pryD/2+minimumWall
+          < tangentx,'Выемка под палец достигает изгиба ручки; уменьшите pryD.')
     if enableSnapFits:
         check(xmax+lidWingLength+wooFitClearance+lidBorder+tongueEngagement+
               tongueClearance+minimumWall < tangentx,'Left tongue reaches the handle bend.')
@@ -592,7 +608,7 @@ def make_cover_outline(comp,vertices,radii,offset,y0,y1,wing_start,wing_end,zc,n
     return body
 
 
-# Справа создаётся упругий язычок в сквозном П-пазу и зуб со скосами.
+# Справа создаются две зеркальные упругие защёлки в сквозных П-пазах.
 # Слева — жёсткий язычок с подкосом и карман для захода под наклоном.
 def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y):
     """Integral in-plane beam in a through U-slot; left tongue has a gusset.
@@ -631,32 +647,38 @@ def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y):
               (outer_bottom,lower_start),(lower_start,lower_mid,lower_end),
               (lower_end,(end_x,tip_bottom)),((end_x,tip_bottom),(end_x,beam_top)),
               ((end_x,beam_top),top_start),(top_start,top_mid,top_end)]
-    cover = cut(comp,cover,prism_xz(comp,curves,-gripD,gripD,'Through_U_release_slot'))
-    # No second rectangular back relief: it used to cut across the curved
-    # slot terminations and leave a step. The beam uses the full lid depth.
-
-    # Open the outer rail beside the hook so the hook cannot fuse to the lid.
-    mouth = box(comp,end_x-snapHookLength-snapClearance,end_x+snapTipGap,
-                -gripD,gripD,beam_top,edge_z+snapClearance,'Edge_release_access')
-    cover = cut(comp,cover,mouth)
-
-    # The tooth grows from a stem on the first layer. Both flanks are sloped,
-    # avoiding a horizontal shelf when printed with the outer face down.
+    # Один профиль задаёт обе защёлки. Нижняя — точное отражение относительно Z=zc.
+    # При подъёме крышки скосы зубьев направляют верхнюю балку к -Z, нижнюю к +Z.
     base_z = edge_z-snapClearance
     peak_z = edge_z+lidGap+snapHook
-    # Основание штыря следует за опущенной балкой, вершина остаётся у посадки.
-    # Поэтому штырь автоматически удлиняется, сохраняя глубину зацепления
-    # snapHook и прежние скосы. Ответный паз ниже строится по этому же профилю.
     nose_y = outer_y-2*snapRamp-snapTipLand
     hook_profile = [(nose_y,beam_top-snapClearance),(outer_y,beam_top-snapClearance),
                     (outer_y,base_z),(outer_y-snapRamp,peak_z),
                     (outer_y-snapRamp-snapTipLand,peak_z),(nose_y,base_z)]
-    hook = prism_yz(comp,hook_profile,end_x-snapHookLength,end_x,'Release_hook')
-    cover = join(comp,cover,hook)
-    # A matching recess is in the SIDE of the lid seat, not deep under the beam.
-    notch = prism_yz(comp,offset_polygon(hook_profile,snapClearance),
-                     end_x-snapHookLength-snapClearance,end_x+snapClearance,'Edge_hook_recess')
-    handle = cut(comp,handle,notch)
+    notch_profile = offset_polygon(hook_profile,snapClearance)
+    for sign, label in [(1,'Upper'),(-1,'Lower')]:
+        def mirror_point(point):
+            return (point[0],zc+sign*(point[1]-zc))
+        slot_curves = [tuple(mirror_point(pt) for pt in curve) for curve in curves]
+        tooth = [mirror_point(pt) for pt in hook_profile]
+        receiver = [mirror_point(pt) for pt in notch_profile]
+        if sign < 0:
+            # После отражения возвращаем прежнее направление обхода контура.
+            slot_curves = [tuple(reversed(curve)) for curve in reversed(slot_curves)]
+            tooth.reverse()
+            receiver.reverse()
+        cover = cut(comp,cover,prism_xz(comp,slot_curves,-gripD,gripD,
+                                        label+'_Through_U_release_slot'))
+        za,zb = sorted([zc+sign*(beam_top-zc),zc+sign*(edge_z+snapClearance-zc)])
+        mouth = box(comp,end_x-snapHookLength-snapClearance,end_x+snapTipGap,
+                    -gripD,gripD,za,zb,label+'_Edge_release_access')
+        cover = cut(comp,cover,mouth)
+        # Оба скоса сохранены: заход при закрытии и выход при подъёме пальцем.
+        hook = prism_yz(comp,tooth,end_x-snapHookLength,end_x,label+'_Release_hook')
+        cover = join(comp,cover,hook)
+        notch = prism_yz(comp,receiver,end_x-snapHookLength-snapClearance,
+                         end_x+snapClearance,label+'_Edge_hook_recess')
+        handle = cut(comp,handle,notch)
 
     # Left tongue has a continuous 45-degree print gusset. With +Y down,
     # its projecting footprint grows one mm per mm of build height.
@@ -697,8 +719,10 @@ def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y):
                          'beam_top_z_mm':beam_top,
                          'hook_rise_from_beam_mm':peak_z-beam_top,
                          'print_face_y_mm':outer_y,
-                         'slot_type':'Through U-slot; integral beam; open edge hook',
-                         'release_direction':'-Z; lift right edge toward +Y, then slide +X',
+                         'latch_count':2,
+                         'finger_recess_diameter_mm':pryD,
+                         'slot_type':'Two mirrored through U-slots and edge hooks',
+                         'release_direction':'Lift latch edge +Y; upper beam flexes -Z, lower +Z; then slide +X',
                          'planned_opening_angle_deg':lidTiltAngle}
 
 
@@ -786,9 +810,13 @@ def run(context):
             report['cover_lock'] = lock_info
         stage = 'Finger/tool release recess'
         # 8. Добавить доступ для поддевания крышки у края.
-        # Vertical small cylinder at outer right wing edge, recessed in front skin.
-        pry = cylinder(comp,wing_end+wooFitClearance+lidBorder,gripD/2,
-                       zc-pryD/2,zc+pryD/2,pryD,'Lift_recess')
+        # Настоящий полукруг виден со стороны крышки: диаметр вдоль Z,
+        # дуга выходит наружу по X. Небольшой заход под торец открывает край.
+        pry_x = wing_end+wooFitClearance+lidBorder-pryUnderlap
+        radius = pryD/2
+        pry_curves = [((pry_x,zc-radius),(pry_x+radius,zc),(pry_x,zc+radius)),
+                      ((pry_x,zc+radius),(pry_x,zc-radius))]
+        pry = prism_xz(comp,pry_curves,seat_y-pryDepth,gripD,'Finger_semicircle_recess')
         handle = cut(comp,handle,pry)
         handle.name = 'Handle'
         cover.name = 'Cover'
@@ -856,8 +884,8 @@ def run(context):
             ui.messageBox('Ручка и крышка созданы в новом документе.\n'
                 f'Полость Y: {-wooHalfDepth:g} .. +{wooHalfDepth:g} мм.\n'
                 f'Высота профиля Woo: {info["height_mm"]:.3f} мм.\n'+
-                ('Слева язычок, справа защёлка с доступом через паз.\n'
-                 'Снятие: отжать язычок в пазу к -Z, поднять правый край к +Y, сдвинуть крышку к +X.\n'
+                ('Слева жёсткий язычок, справа две зеркальные защёлки.\n'
+                 'Снятие: подцепить край в полукруглой выемке, поднять к +Y и сдвинуть крышку к +X.\n'
                  'Посадку и ход снятия проверьте пробной печатью.\n' if enableSnapFits
                  else 'Крышка без защёлок: сохранён посадочный бортик, фиксации нет.\n')+
                 'STL/F3D и отчёт: '+folder,modelName+' v'+scriptVersion)
