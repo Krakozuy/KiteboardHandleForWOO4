@@ -17,7 +17,7 @@ API хранит координаты в см: перевод выполняет
 """
 
 # ==================== SETTINGS / НАСТРОЙКИ ====================
-scriptVersion = '1.0.23'       # Версия повышается при каждом обновлении.
+scriptVersion = '1.0.24'       # Версия повышается при каждом обновлении.
 fitGap = 0.20  # Общий посадочный зазор НА СТОРОНУ, мм.
 boltSpacing = 180.0  # Межцентровое расстояние крепёжных болтов по X.
 handleTop = 72.0  # Полная высота от поверхности доски.
@@ -69,8 +69,8 @@ lidWingH = 11.0  # Высота боковых участков крышки п�
 lidWingR = 1.0  # Радиус углов боковых участков.
 enableSnapFits = True  # Жёсткий язычок слева и две зеркальные защёлки справа.
 snapLength = 12.0  # Свободная длина упругого язычка вдоль X.
-snapThickness = 1.2  # Толщина свободного конца по Z; отжим к -Z.
-snapRootThickness = 1.8  # Толщина у корня; к свободному концу язычок сужается.
+snapThickness = 1.4  # Толщина свободного конца по Z; обе балки усилены для более тугой посадки.
+snapRootThickness = 2.0  # Толщина у корня; к свободному концу язычок сужается.
 snapWidth = gripD/2-(wooHalfDepth-lidSeatDepth+lidAxialGap)  # Вычисляемая глубина язычка по Y: вся толщина крышки, без уступа.
 snapRootLength = 2.0  # Длина закреплённого участка у корня защёлки.
 snapHook = 0.60  # Глубина обоих зубьев за край посадки: верхний к +Z, нижний к -Z.
@@ -92,9 +92,16 @@ tongueClearance = fitGap  # Зазор на сторону в кармане ж�
 tongueMotionSteps = 12  # Число положений для построения огибающей кармана при наклоне.
 lidTiltAngle = 2.0  # Расчётный угол наклона крышки при снятии, градусы.
 lidTiltClearance = fitGap  # Зазор у левого поворотного края крышки.
-pryD = 10.0  # Диаметр полукруглой выемки под палец в плоскости крышки XZ.
-pryUnderlap = 0.8  # Насколько выемка заходит под торец крышки по X.
-pryDepth = 1.5  # Глубина выемки за посадкой по Y, чтобы подцепить край ногтем.
+pryWidth = 10.0  # Ширина входа ложбинки по Z на наружной плоскости ручки.
+pryLength = 16.0  # Длина плавного подхода по X от края под крышкой наружу.
+pryUnderlap = 0.8  # Заход ложбинки под исходный торец крышки по X.
+pryDepth = 6.5  # Максимальная глубина ложбинки ОТ НАРУЖНОЙ поверхности по Y.
+pryBowlCenterRatio = 0.75  # Форма эллипсоидального дна: смещение центра / радиус по Y.
+pryLipWidth = 6.0  # Ширина округлой полочки крышки по Z.
+pryLipProjection = 1.8  # Выступ полочки по X в ложбинку, ниже поверхности хвата.
+pryLipThickness = 2.4  # Толщина полочки по Y.
+pryLipRoot = 1.5  # Перекрытие полочки с исходным краем крышки по X.
+pryLipR = 0.8  # Скругления полочки в проекциях XY и XZ.
 minimumWall = 1.5  # Минимум для геометрических ограничений, не расчёт прочности.
 
 makeFitSample = False  # Создать отдельные фрагменты крепления для пробной печати.
@@ -551,11 +558,26 @@ def validate(info, vertices):
     check(abs(wooZOffset)+info['height_mm']/2+wooFitClearance+lidBorder+lidGap < gripH/2,'Cover seat does not fit grip height.')
     check(lidGap > 0 and lidBorder > lidGap and lidSeatDepth > lidAxialGap,'Invalid lid seat/gap.')
     wing_half = lidWingH/2+wooFitClearance+lidBorder
-    check(0 < pryD/2 < wing_half-minimumWall,
-          'Выемка под палец слишком широкая: оставьте материал до верхнего и нижнего края.')
-    check(0 < pryDepth < wooHalfDepth-lidSeatDepth+gripD/2-minimumWall and
-          0 < pryUnderlap < lidWingLength,
-          'Недопустимая глубина выемки или заход под торец крышки.')
+    check(0 < pryWidth/2 < wing_half-minimumWall,
+          'Ложбинка слишком широкая: оставьте материал до верхнего и нижнего гнезда.')
+    check(0 < pryDepth < gripD-minimumWall and 0 < pryUnderlap < lidWingLength,
+          'Недопустимая глубина ложбинки или заход под крышку.')
+    check(pryLength > pryDepth and 0 < pryBowlCenterRatio < 1,
+          'Подход ложбинки должен быть длиннее глубины; коэффициент формы должен быть между 0 и 1.')
+    check(0 < pryLipWidth < pryWidth and 0 < pryLipProjection < pryLength-pryUnderlap and
+          0 < pryLipRoot < lidWingLength and 0 < pryLipThickness <= snapWidth,
+          'Недопустимые размеры полочки для захвата.')
+    check(0 < pryLipR < min(pryLipRoot+pryLipProjection,pryLipWidth,pryLipThickness)/2,
+          'Радиус полочки слишком большой.')
+    # Оценка доступного места под нижними углами полочки по поверхности эллипсоида.
+    bowl_factor = math.sqrt(1-pryBowlCenterRatio**2)
+    bowl_rx, bowl_rz = pryLength/bowl_factor, pryWidth/(2*bowl_factor)
+    bowl_ry = pryDepth/(1-pryBowlCenterRatio)
+    lip_q = 1-((pryUnderlap+pryLipProjection)/bowl_rx)**2-(pryLipWidth/(2*bowl_rz))**2
+    check(lip_q > 0,'Полочка выходит за пределы ложбинки.')
+    lip_floor = gripD/2+bowl_ry*pryBowlCenterRatio-bowl_ry*math.sqrt(lip_q)
+    check(gripD/2-pryLipThickness-lip_floor >= minimumWall,
+          'Под полочкой слишком мало места для захвата: углубите или расширьте ложбинку.')
     if enableSnapFits:
         check(0 < snapClearance < snapHook < snapFlexSpace,'Invalid latch engagement/release travel.')
         check(snapRootThickness >= snapThickness > 0 and snapRootLength > snapFlexSpace/2,
@@ -606,8 +628,8 @@ def validate(info, vertices):
     xmax = max(abs(x) for x,z in vertices)+wooFitClearance
     check(xmax+lidWingLength+lidGap+minimumWall < tangentx,
           'Bolt spacing too short: cover wings reach bends. Increase boltSpacing or reduce wings.')
-    check(xmax+lidWingLength+wooFitClearance+lidBorder-pryUnderlap+pryD/2+minimumWall
-          < tangentx,'Выемка под палец достигает изгиба ручки; уменьшите pryD.')
+    check(xmax+lidWingLength+wooFitClearance+lidBorder-pryUnderlap+pryLength+minimumWall
+          < boltSpacing/2-headPocketD/2,'Ложбинка достигает зоны болта; уменьшите pryLength.')
     if enableSnapFits:
         check(xmax+lidWingLength+wooFitClearance+lidBorder+tongueEngagement+
               tongueClearance+minimumWall < tangentx,'Left tongue reaches the handle bend.')
@@ -738,13 +760,74 @@ def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y):
                          'hook_rise_from_beam_mm':peak_z-beam_top,
                          'print_face_y_mm':outer_y,
                          'latch_count':2,
-                         'finger_recess_diameter_mm':pryD,
+                         'finger_recess_width_mm':pryWidth,
                          'slot_type':'Two mirrored through U-slots and edge hooks',
                          'release_direction':'Lift latch edge +Y; upper beam flexes -Z, lower +Z; then slide +X',
                          'planned_opening_angle_deg':lidTiltAngle}
 
 
-# TPU-ПРОСТАВКИ. Копируем именно плоский торец ножки после обрезки на Z=0.
+# Эллипсоидальное дно получается неравномерным масштабированием сферы.
+# Сфера и точка масштаба создаются в одном компоненте, поэтому оси — X/Y/Z ручки.
+def ellipsoid_body(comp, center, rx, ry, rz, name):
+    tbm = adsk.fusion.TemporaryBRepManager.get()
+    # Исходная сфера радиусом 1 мм; коэффициенты масштаба безразмерные.
+    sphere = tbm.createSphere(p(*center),0.1)
+    check(sphere is not None,'Не удалось создать сферу для ложбинки.')
+    body = comp.bRepBodies.add(sphere)
+    sk = sketch_plane(comp,center,(0,0,1),name+'_scale_origin')
+    origin = sk.sketchPoints.add(sk.modelToSketchSpace(p(*center)))
+    scales = comp.features.scaleFeatures
+    inp = scales.createInput(collection([body]),origin,adsk.core.ValueInput.createByReal(1))
+    check(inp.setToNonUniform(adsk.core.ValueInput.createByReal(rx),
+                             adsk.core.ValueInput.createByReal(ry),
+                             adsk.core.ValueInput.createByReal(rz)),
+          'Не удалось задать форму ложбинки.')
+    feature = scales.add(inp)
+    # В Direct Design некоторые операции изменяют тело без объекта истории.
+    if feature is not None:
+        check(feature.bodies.count == 1,'Масштабирование должно дать одно тело.')
+        body = feature.bodies.item(0)
+    check(body is not None and body.isValid and body.isSolid,'Не удалось получить тело ложбинки.')
+    body.name = name
+    sk.isVisible = False
+    return body
+
+
+# Ложбинка плавно поднимается от глубокого места под полочкой к наружной коже.
+# В отличие от прежнего выдавленного полукруга, её дно и боковины криволинейные.
+def finger_scoop(comp,handle,cover,wing_end,zc):
+    edge_x = wing_end+wooFitClearance+lidBorder
+    start_x = edge_x-pryUnderlap
+    outer_y = gripD/2
+    factor = math.sqrt(1-pryBowlCenterRatio**2)
+    rx, rz = pryLength/factor, pryWidth/(2*factor)
+    ry = pryDepth/(1-pryBowlCenterRatio)
+    cy = outer_y+ry*pryBowlCenterRatio
+    scoop = ellipsoid_body(comp,(start_x,cy,zc),rx,ry,rz,'Finger_scoop_ellipsoid')
+    # Отсекается половина за крышкой, чтобы сохранить её механизм и камеру.
+    # Левая граница утоплена под край и не является входной стенкой для пальца.
+    mask = box(comp,start_x,start_x+pryLength+geometryTolerance,-gripD,cy+ry+geometryTolerance,
+               zc-rz-geometryTolerance,zc+rz+geometryTolerance,'Finger_scoop_limit')
+    scoop = intersect(comp,scoop,mask)
+    handle = cut(comp,handle,scoop)
+
+    # Полочка выступает в ложбинку по X, но никогда не поднимается выше Y=gripD/2.
+    # Пересечение двух скруглённых призм смягчает торец как в плане, так и по толщине.
+    xa, xb = edge_x-pryLipRoot, edge_x+pryLipProjection
+    za, zb = zc-pryLipWidth/2, zc+pryLipWidth/2
+    ya = outer_y-pryLipThickness
+    outline = rounded_polygon([(xa,za),(xb,za),(xb,zb),(xa,zb)],[pryLipR]*4)
+    lip = prism_xz(comp,outline,ya,outer_y,'Rounded_finger_lip')
+    rounding = rounded_polygon([(xa,ya),(xb,ya),(xb,outer_y),(xa,outer_y)],[pryLipR]*4)
+    sk = sketch_plane(comp,(0,0,za),(0,0,1),'Finger_lip_thickness_rounding')
+    profile = draw_curves(sk,rounding,lambda q:(q[0],q[1],za))
+    lip = intersect(comp,lip,extrude(comp,profile,pryLipWidth,'Finger_lip_rounding_tool'))
+    cover = join(comp,cover,lip)
+    return handle,cover,{'type':'curved ellipsoidal scoop with rounded pull lip',
+                         'length_mm':pryLength,'width_mm':pryWidth,'depth_mm':pryDepth,
+                         'lip_projection_mm':pryLipProjection,'lip_thickness_mm':pryLipThickness}
+
+# TPU-ПРОСТАВКИ. Копируем плоский торец ножки после обрезки на Z=0.
 # Его скругления при наклоне не равны обычному прямоугольнику с радиусами.
 def make_foot_pads(comp, handle):
     tbm = adsk.fusion.TemporaryBRepManager.get()
@@ -890,16 +973,9 @@ def run(context):
         if enableSnapFits:
             handle,cover,lock_info = releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y)
             report['cover_lock'] = lock_info
-        stage = 'Finger/tool release recess'
-        # 8. Добавить доступ для поддевания крышки у края.
-        # Настоящий полукруг виден со стороны крышки: диаметр вдоль Z,
-        # дуга выходит наружу по X. Небольшой заход под торец открывает край.
-        pry_x = wing_end+wooFitClearance+lidBorder-pryUnderlap
-        radius = pryD/2
-        pry_curves = [((pry_x,zc-radius),(pry_x+radius,zc),(pry_x,zc+radius)),
-                      ((pry_x,zc+radius),(pry_x,zc-radius))]
-        pry = prism_xz(comp,pry_curves,seat_y-pryDepth,gripD,'Finger_semicircle_recess')
-        handle = cut(comp,handle,pry)
+        stage = 'Smooth finger scoop and rounded pull lip'
+        handle,cover,scoop_info = finger_scoop(comp,handle,cover,wing_end,zc)
+        report['finger_access'] = scoop_info
         pad_bodies = []
         if enableFootPads:
             stage = 'TPU foot pads and matching pockets'
@@ -989,7 +1065,7 @@ def run(context):
                 f'Полость Y: {-wooHalfDepth:g} .. +{wooHalfDepth:g} мм.\n'
                 f'Высота профиля Woo: {info["height_mm"]:.3f} мм.\n'+
                 ('Слева жёсткий язычок, справа две зеркальные защёлки.\n'
-                 'Снятие: подцепить край в полукруглой выемке, поднять к +Y и сдвинуть крышку к +X.\n'
+                 'Снятие: подцепить край за округлую полочку в ложбинке, поднять к +Y и сдвинуть крышку к +X.\n'
                  'Посадку и ход снятия проверьте пробной печатью.\n' if enableSnapFits
                  else 'Крышка без защёлок: сохранён посадочный бортик, фиксации нет.\n')+
                 ('TPU: две проставки, отдельные STL TPU_Pad_Left и TPU_Pad_Right.\n' if enableFootPads else '')+
