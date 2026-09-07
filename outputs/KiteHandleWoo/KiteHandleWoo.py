@@ -17,7 +17,7 @@ API хранит координаты в см: перевод выполняет
 """
 
 # ==================== SETTINGS / НАСТРОЙКИ ====================
-scriptVersion = '1.0.27'       # Версия повышается при каждом обновлении.
+scriptVersion = '1.0.28'       # Версия повышается при каждом обновлении.
 fitGap = 0.20  # Общий посадочный зазор НА СТОРОНУ, мм.
 boltSpacing = 180.0  # Межцентровое расстояние крепёжных болтов по X.
 handleTop = 72.0  # Полная высота от поверхности доски.
@@ -75,9 +75,12 @@ snapWidth = gripD/2-(wooHalfDepth-lidSeatDepth+lidAxialGap)  # Вычисляе�
 snapRootLength = 2.0  # Длина закреплённого участка у корня защёлки.
 snapHook = 0.75  # Глубина обоих зубьев за край посадки: верхний к +Z, нижний к -Z.
 snapHookLength = 2.5  # Длина зуба вдоль X у свободного конца.
-snapRamp = 1.1  # Удлинённые скосы для увеличенных зубьев: заход, выход и печать.
+snapRamp = 1.1  # Минимальная длина каждого скоса по Y; при необходимости увеличивается автоматически.
 snapTipLand = 0.4  # Плоский участок на вершине зуба.
-snapClearance = 0.1  # Зазор НА СТОРОНУ: с обеих сторон стойки каждого зуба по X и в ответном гнезде.
+snapClearance = 0.2  # Зазор НА СТОРОНУ: с обеих сторон стойки каждого зуба по X и в ответном гнезде.
+# Вычисляемая длина: скос не короче подъёма зуба, чтобы сохранить уклон до 45°.
+# При snapClearance=0.2 и остальных стандартных размерах получается 1.15 мм.
+snapRampEffective = max(snapRamp, lidGap+snapHook+snapClearance)
 snapFlexSpace = 0.85  # Место для отжима под язычком; рабочий ход, не зазор посадки.
 snapUpperGap = snapFlexSpace  # Верхний зазор по Z равен нижнему: 0.85 мм.
 snapEdgeRail = 2.0  # Толщина полосы крышки над пазом по Z; у зуба она раскрывается.
@@ -581,11 +584,11 @@ def validate(info, vertices):
         check(0 < snapClearance < snapHook < snapFlexSpace,'Invalid latch engagement/release travel.')
         check(snapRootThickness >= snapThickness > 0 and snapRootLength > snapFlexSpace/2,
               'Invalid tapered beam/root dimensions.')
-        check(snapWidth > 2*snapRamp+snapTipLand and
+        check(snapRamp > 0,'Минимальная длина скоса snapRamp должна быть положительной.')
+        check(snapWidth > 2*snapRampEffective+snapTipLand and
               snapWidth <= gripD/2-(wooHalfDepth-lidSeatDepth+lidAxialGap)+geometryTolerance,
-              'Beam must fit within the cover thickness and contain both hook ramps.')
-        check(snapRamp >= lidGap+snapHook+snapClearance,
-              'Hook ramps must be at least as long as the hook rise for printable slopes.')
+              'В толщине крышки не помещаются оба автоматически рассчитанных скоса зуба: '
+              'уменьшите snapRamp, snapHook или snapClearance либо увеличьте толщину крышки.')
         check(0 < snapHookLength < snapLength and mechanismKeepout > snapClearance,
               'Invalid hook length or WOO keepout.')
         check(snapHookLength+snapClearance < snapLength,
@@ -693,10 +696,10 @@ def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y):
     # При подъёме крышки скосы зубьев направляют верхнюю балку к -Z, нижнюю к +Z.
     base_z = edge_z-snapClearance
     peak_z = edge_z+lidGap+snapHook
-    nose_y = outer_y-2*snapRamp-snapTipLand
+    nose_y = outer_y-2*snapRampEffective-snapTipLand
     hook_profile = [(nose_y,beam_top-snapClearance),(outer_y,beam_top-snapClearance),
-                    (outer_y,base_z),(outer_y-snapRamp,peak_z),
-                    (outer_y-snapRamp-snapTipLand,peak_z),(nose_y,base_z)]
+                    (outer_y,base_z),(outer_y-snapRampEffective,peak_z),
+                    (outer_y-snapRampEffective-snapTipLand,peak_z),(nose_y,base_z)]
     notch_profile = offset_polygon(hook_profile,snapClearance)
     for sign, label in [(1,'Upper'),(-1,'Lower')]:
         def mirror_point(point):
