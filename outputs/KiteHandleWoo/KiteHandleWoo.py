@@ -6,7 +6,8 @@ The design is rebuilt from Python settings (direct solid modelling).
 """
 
 # ==================== SETTINGS / НАСТРОЙКИ ====================
-scriptVersion = '1.0.13'       # Incremented with each published update.
+scriptVersion = '1.0.14'       # Incremented with each published update.
+fitGap = 0.1                  # Shared nominal fitting clearance, mm PER SIDE.
 boltSpacing = 180.0
 handleTop = 72.0
 gripH = 28.0                  # Uniform section, normal to path, INCLUDING legs.
@@ -37,9 +38,9 @@ wooZOffset = 0.0              # Offset from middle height of grip.
 wooFitClearance = 0.0          # Optional outward profile clearance; 0 = drawing.
 
 lidBorder = 1.15               # Seat width around opening in XZ.
-lidGap = 0.25                  # Radial contour clearance PER SIDE.
+lidGap = fitGap                # Radial contour clearance PER SIDE.
 lidSeatDepth = 1.1             # Extra rim depth outside useful WOO volume.
-lidAxialGap = 0.15             # Gap above seat in assembled position.
+lidAxialGap = fitGap           # Gap above seat in assembled position.
 lidWingLength = 16.0           # Room for the longitudinal release beam outside WOO.
 lidWingH = 11.0                # Wider wing for the in-plane U-slot and edge catch.
 lidWingR = 1.0
@@ -49,15 +50,15 @@ snapThickness = 1.2            # Tip thickness along Z; beam flexes toward -Z.
 snapRootThickness = 1.8        # Taper from thick root to thinner tip.
 snapWidth = 3.0                # Beam depth along Y, not length of insertion.
 snapRootLength = 2.0
-snapRootR = 0.3                # Rounded ends of the U-slot at the fixed root.
+snapRootR = fitGap*0.4         # Must fit the narrowed U-slot ends.
 snapHook = 0.45                # Engagement beyond the seat edge, toward +Z.
 snapHookLength = 2.5           # Hook length along X at the free end.
 snapRamp = 1.0                 # Both hook ramps: enough run for <=45-degree growth.
 snapTipLand = 0.4
-snapClearance = 0.2
+snapClearance = fitGap
 snapFlexSpace = 0.85           # Lower U-slot gap; remaining cover limits travel.
-snapUpperGap = 0.65            # Upper U-slot gap.
-snapTipGap = 0.65              # Free-end U-slot gap.
+snapUpperGap = fitGap          # Upper U-slot gap.
+snapTipGap = fitGap            # Free-end U-slot gap.
 snapEdgeRail = 1.0             # Cover strip outside upper slot, opened at hook.
 mechanismKeepout = 0.8         # Separation from maximum WOO profile width.
 tongueEngagement = 1.2         # Short tuck-in engagement; rigid tongue, not a snap.
@@ -65,10 +66,10 @@ tongueThickness = 1.6
 tongueTipThickness = 0.8       # Thin leading tip with a second insertion bevel.
 tongueWidth = 5.0
 tongueRootLength = 3.0
-tongueClearance = 0.25         # Nominal clearance per side in the tongue pocket.
+tongueClearance = fitGap       # Nominal clearance per side in the tongue pocket.
 tongueMotionSteps = 12         # Construction samples for the pocket's motion envelope.
-lidTiltAngle = 5.0             # Planned opening angle, degrees.
-lidTiltClearance = 0.6         # Extra opening clearance at the left pivot edge.
+lidTiltAngle = 2.0             # Smaller planned tilt for the tighter edge clearance.
+lidTiltClearance = fitGap      # Clearance at the left pivot edge.
 pryD = 2.5                    # Recess at wing edge to lift the cover.
 minimumWall = 1.5              # Geometry guard, not a strength certification.
 
