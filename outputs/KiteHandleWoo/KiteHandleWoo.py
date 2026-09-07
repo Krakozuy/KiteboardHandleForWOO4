@@ -6,7 +6,7 @@ The design is rebuilt from Python settings (direct solid modelling).
 """
 
 # ==================== SETTINGS / НАСТРОЙКИ ====================
-scriptVersion = '1.0.14'       # Incremented with each published update.
+scriptVersion = '1.0.15'       # Incremented with each published update.
 fitGap = 0.1                  # Shared nominal fitting clearance, mm PER SIDE.
 boltSpacing = 180.0
 handleTop = 72.0
@@ -48,9 +48,8 @@ enableSnapFits = True          # One LEFT rigid tongue + one RIGHT releasable ca
 snapLength = 12.0              # FREE beam length along X, parallel to the cover.
 snapThickness = 1.2            # Tip thickness along Z; beam flexes toward -Z.
 snapRootThickness = 1.8        # Taper from thick root to thinner tip.
-snapWidth = 3.0                # Beam depth along Y, not length of insertion.
+snapWidth = gripD/2-(wooHalfDepth-lidSeatDepth+lidAxialGap)  # Full lid thickness; no stepped back pocket.
 snapRootLength = 2.0
-snapRootR = fitGap*0.4         # Must fit the narrowed U-slot ends.
 snapHook = 0.45                # Engagement beyond the seat edge, toward +Z.
 snapHookLength = 2.5           # Hook length along X at the free end.
 snapRamp = 1.0                 # Both hook ramps: enough run for <=45-degree growth.
@@ -467,10 +466,10 @@ def validate(info, vertices):
     check(lidGap > 0 and lidBorder > lidGap and lidSeatDepth > lidAxialGap,'Invalid lid seat/gap.')
     if enableSnapFits:
         check(0 < snapClearance < snapHook < snapFlexSpace,'Invalid latch engagement/release travel.')
-        check(snapRootThickness >= snapThickness > 0 and snapRootLength > 2*snapRootR,
+        check(snapRootThickness >= snapThickness > 0 and snapRootLength > snapFlexSpace/2,
               'Invalid tapered beam/root dimensions.')
         check(snapWidth > 2*snapRamp+snapTipLand and
-              snapWidth < gripD/2-(wooHalfDepth-lidSeatDepth+lidAxialGap),
+              snapWidth <= gripD/2-(wooHalfDepth-lidSeatDepth+lidAxialGap)+geometryTolerance,
               'Beam must fit within the cover thickness and contain both hook ramps.')
         check(snapRamp >= lidGap+snapHook+snapClearance,
               'Hook ramps must be at least as long as the hook rise for printable slopes.')
@@ -478,8 +477,8 @@ def validate(info, vertices):
               'Invalid hook length or WOO keepout.')
         check(mechanismKeepout+snapRootLength+snapLength+snapTipGap+minimumWall
               < lidWingLength+lidBorder,'Lid wing too short for the in-plane U-slot.')
-        check(0 < snapRootR < min(snapUpperGap,snapFlexSpace)/2 and
-              snapTipGap > 0 and snapEdgeRail > 0,'Invalid U-slot widths or end radii.')
+        check(snapUpperGap > 0 and snapFlexSpace > 0 and
+              snapTipGap > 0 and snapEdgeRail > 0,'Invalid U-slot widths.')
         wing_half = lidWingH/2+wooFitClearance+lidBorder
         check(wing_half-snapEdgeRail-snapUpperGap-snapRootThickness-snapFlexSpace
               > -wing_half+minimumWall,'U-slot leaves too little material below the beam.')
@@ -541,26 +540,27 @@ def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y):
 
     # One continuous U-cut leaves the original lid material as the beam.
     # The lower slot also provides a mechanical stop after snapFlexSpace travel.
-    u = [(root_x,beam_top+snapUpperGap),(end_x+snapTipGap,beam_top+snapUpperGap),
-         (end_x+snapTipGap,tip_bottom-snapFlexSpace),
-         (root_x,root_bottom-snapFlexSpace),(root_x,root_bottom),
-         (end_x,tip_bottom),(end_x,beam_top),(root_x,beam_top)]
-    curves = [(u[i],u[(i+1)%len(u)]) for i in range(len(u))]
+    # Exact semicircular caps, tangent to the two edges of each slot.
+    # The lower slot is inclined: use its NORMAL width, not the vertical gap.
+    slope = (tip_bottom-root_bottom)/snapLength
+    scale = math.sqrt(1+slope*slope)
+    lower_r = snapFlexSpace/(2*scale)
+    center = (root_x,root_bottom-snapFlexSpace/2)
+    lower_start = (center[0]+lower_r*slope/scale,center[1]-lower_r/scale)
+    lower_end = (center[0]-lower_r*slope/scale,center[1]+lower_r/scale)
+    lower_mid = (center[0]-lower_r/scale,center[1]-lower_r*slope/scale)
+    top_start = (root_x,beam_top)
+    top_end = (root_x,beam_top+snapUpperGap)
+    top_mid = (root_x-snapUpperGap/2,beam_top+snapUpperGap/2)
+    outer_top = (end_x+snapTipGap,beam_top+snapUpperGap)
+    outer_bottom = (end_x+snapTipGap,tip_bottom-snapFlexSpace+slope*snapTipGap)
+    curves = [(top_end,outer_top),(outer_top,outer_bottom),
+              (outer_bottom,lower_start),(lower_start,lower_mid,lower_end),
+              (lower_end,(end_x,tip_bottom)),((end_x,tip_bottom),(end_x,beam_top)),
+              ((end_x,beam_top),top_start),(top_start,top_mid,top_end)]
     cover = cut(comp,cover,prism_xz(comp,curves,-gripD,gripD,'Through_U_release_slot'))
-    # Round the two closed slot ends where the beam meets the fixed lid.
-    for z in [beam_top+snapUpperGap/2,root_bottom-snapFlexSpace/2]:
-        sk = sketch_plane(comp,(0,-gripD,0),(0,1,0),'U_slot_root_relief')
-        sk.sketchCurves.sketchCircles.addByCenterRadius(
-            sk.modelToSketchSpace(p(root_x,-gripD,z)),snapRootR/10)
-        tool = extrude(comp,sk.profiles.item(0),2*gripD,'U_slot_root_relief')
-        sk.isVisible = False
-        cover = cut(comp,cover,tool)
-
-    # Remove excess from the back of the free beam, not from its print face.
-    # The beam remains attached at its left root and starts directly on the bed.
-    back_relief = box(comp,root_x,end_x, -gripD,beam_front,
-                      root_bottom-snapClearance,beam_top+snapClearance,'Beam_back_relief')
-    cover = cut(comp,cover,back_relief)
+    # No second rectangular back relief: it used to cut across the curved
+    # slot terminations and leave a step. The beam uses the full lid depth.
 
     # Open the outer rail beside the hook so the hook cannot fuse to the lid.
     mouth = box(comp,end_x-snapHookLength-snapClearance,end_x+snapTipGap,
