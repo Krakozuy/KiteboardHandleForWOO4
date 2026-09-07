@@ -17,7 +17,7 @@ API хранит координаты в см: перевод выполняет
 """
 
 # ==================== SETTINGS / НАСТРОЙКИ ====================
-scriptVersion = '1.0.25'       # Версия повышается при каждом обновлении.
+scriptVersion = '1.0.26'       # Версия повышается при каждом обновлении.
 fitGap = 0.20  # Общий посадочный зазор НА СТОРОНУ, мм.
 boltSpacing = 180.0  # Межцентровое расстояние крепёжных болтов по X.
 handleTop = 72.0  # Полная высота от поверхности доски.
@@ -81,6 +81,7 @@ snapClearance = 0.1  # Локальный зазор гнёзд зубьев; у
 snapFlexSpace = 0.85  # Место для отжима под язычком; рабочий ход, не зазор посадки.
 snapUpperGap = snapFlexSpace  # Верхний зазор по Z равен нижнему: 0.85 мм.
 snapTipGap = fitGap  # Зазор у свободного торца язычка.
+snapMouthGap = fitGap  # Боковой зазор между стойкой зуба и краем крышки у выхода П-паза.
 snapEdgeRail = 2.0  # Толщина полосы крышки над пазом по Z; у зуба она раскрывается.
 mechanismKeepout = 0.8  # Отступ крепления от максимальной ширины полости WOO.
 tongueEngagement = 1.2  # Глубина захода жёсткого левого язычка в карман.
@@ -589,6 +590,8 @@ def validate(info, vertices):
               'Hook ramps must be at least as long as the hook rise for printable slopes.')
         check(0 < snapHookLength < snapLength and mechanismKeepout > snapClearance,
               'Invalid hook length or WOO keepout.')
+        check(snapMouthGap > 0 and snapHookLength+snapMouthGap < snapLength,
+              'Боковой зазор зуба должен быть положительным и не доходить до корня балки.')
         check(mechanismKeepout+snapRootLength+snapLength+snapTipGap+minimumWall
               < lidWingLength+lidBorder,'Lid wing too short for the in-plane U-slot.')
         check(snapUpperGap > 0 and snapFlexSpace > 0 and
@@ -710,7 +713,9 @@ def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y):
         cover = cut(comp,cover,prism_xz(comp,slot_curves,-gripD,gripD,
                                         label+'_Through_U_release_slot'))
         za,zb = sorted([zc+sign*(beam_top-zc),zc+sign*(edge_z+snapClearance-zc)])
-        mouth = box(comp,end_x-snapHookLength-snapClearance,end_x+snapTipGap,
+        # Раскрываем край крышки рядом со стойкой зуба на стандартный зазор.
+        # Глубина зуба и посадка в ответном гнезде задаются независимо.
+        mouth = box(comp,end_x-snapHookLength-snapMouthGap,end_x+snapTipGap,
                     -gripD,gripD,za,zb,label+'_Edge_release_access')
         cover = cut(comp,cover,mouth)
         # Оба скоса сохранены: заход при закрытии и выход при подъёме пальцем.
