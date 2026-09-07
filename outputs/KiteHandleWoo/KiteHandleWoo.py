@@ -1,86 +1,97 @@
 # -*- coding: utf-8 -*-
-"""Fusion 360: kiteboard handle + flush removable WOO cover.
-Edit the SETTINGS below, then run from Utilities > Scripts and Add-Ins.
-Each run creates a NEW document. Dimensions below are millimetres.
-The design is rebuilt from Python settings (direct solid modelling).
+"""Ручка кайтборда с полостью WOO и съёмной крышкой заподлицо.
+
+КАРТА ФАЙЛА:
+- Настройки: размеры, зазоры, параметры креплений и экспорта.
+- Вспомогательные функции: контуры, эскизы, операции с телами.
+- handle_blank: ручка; woo_geometry: полость; releasable_lock: крепления.
+- run: вся последовательность построения и сохранение файлов.
+
+Оси: X — вдоль перекладины, Y — поперёк хвата, Z — высота над доской.
+Поверхность доски: Z=0. Крышка находится со стороны +Y.
+Левая/правая сторона в коде: -X/+X, независимо от ракурса камеры.
+Все длины в настройках — мм, угол lidTiltAngle — градусы.
+API хранит координаты в см: перевод выполняется во вспомогательных функциях.
+Каждый запуск создаёт новый документ в режиме Direct Design.
+Размеры меняются здесь, затем модель строится заново.
 """
 
 # ==================== SETTINGS / НАСТРОЙКИ ====================
-scriptVersion = '1.0.16'       # Incremented with each published update.
-fitGap = 0.1                  # Shared nominal fitting clearance, mm PER SIDE.
-boltSpacing = 180.0
-handleTop = 72.0
-gripH = 28.0                  # Uniform section, normal to path, INCLUDING legs.
-gripD = 28.0                  # Uniform section depth along Y, INCLUDING legs.
-legLean = 20.0
-boltD = 6.6
-headPocketD = 13.0
-shoulder = 4.0                 # Material beneath bolt head, measured from board.
+scriptVersion = '1.0.17'       # Версия повышается при каждом обновлении.
+fitGap = 0.1  # Общий посадочный зазор НА СТОРОНУ, мм.
+boltSpacing = 180.0  # Межцентровое расстояние крепёжных болтов по X.
+handleTop = 72.0  # Полная высота от поверхности доски.
+gripH = 28.0  # Размер постоянного сечения поперёк оси ручки, включая ножки.
+gripD = 28.0  # Глубина постоянного сечения по Y, включая ножки.
+legLean = 20.0  # Смещение верхнего конца прямой ножки внутрь относительно болта.
+boltD = 6.6  # Диаметр сквозного отверстия под M6.
+headPocketD = 13.0  # Диаметр доступа к головке болта.
+shoulder = 4.0  # Толщина опоры под головкой от поверхности доски.
 
-gripR = 6.0                    # Same section radius for legs, bends and grip.
-printFriendlySection = True   # Symmetric 45-degree slopes on BOTH Y faces.
-sectionChamfer = 3.0          # Reduced symmetrically to keep walls around enlarged WOO.
-bendR = 17.0                   # Centre-line radius of the two upper bends.
-baseTrimMargin = 1.0           # Extra stock below board before trimming at Z=0.
+gripR = 6.0  # Радиус сечения ножек, изгибов и перекладины.
+printFriendlySection = True  # Симметричные скосы 45 градусов с обеих сторон по Y.
+sectionChamfer = 3.0  # Размер скосов; 3 мм оставляют место вокруг увеличенной полости.
+bendR = 17.0  # Радиус осевой линии верхних изгибов, не радиус сечения.
+baseTrimMargin = 1.0  # Запас ниже доски перед обрезкой основания на Z=0.
 
-# Drawing: flat tangent-to-tangent lengths, NOT sharp-vertex widths.
-wooTopFlat = 32.044
-wooBottomFlat = 51.279
-wooSlopeRise = 12.203          # Vertical distance of the LONG straight slope.
-wooTopChord = 0.862            # Chord across R1 top arc; determines slope angle.
-wooShortSide = 2.255           # Length of the short lower straight side.
-wooTopR = 1.0
-wooSideR = 1.0
-wooBottomR = 0.5
-wooSideChordReference = 0.960  # Rounded reference dimension, checked in report.
-wooHalfDepth = 11.0            # Empty cavity Y=-11..+11, including under cover.
-wooProfileOffset = 3.0        # True outward offset of the drawing contour in XZ.
-wooZOffset = 0.0              # Offset from middle height of grip.
-wooFitClearance = 0.0          # Optional outward profile clearance; 0 = drawing.
+# ПОЛОСТЬ WOO: исходные размеры между точками касания скруглений.
+wooTopFlat = 32.044  # Длина верхней прямой между касаниями скруглений.
+wooBottomFlat = 51.279  # Длина нижней прямой между касаниями скруглений.
+wooSlopeRise = 12.203  # Перепад высоты длинного наклонного прямого участка.
+wooTopChord = 0.862  # Хорда верхней дуги для восстановления угла наклона.
+wooShortSide = 2.255  # Длина короткого нижнего наклонного участка.
+wooTopR = 1.0  # Радиус верхних углов исходного профиля.
+wooSideR = 1.0  # Радиус боковых углов исходного профиля.
+wooBottomR = 0.5  # Радиус нижних углов исходного профиля.
+wooSideChordReference = 0.960  # Справочная хорда из чертежа для сопоставления с отчётом.
+wooHalfDepth = 11.0  # Половина полезной глубины: полость от Y=-11 до Y=+11.
+wooProfileOffset = 3.0  # Расширение исходного контура наружу в плоскости XZ.
+wooZOffset = 0.0  # Сдвиг полости по Z относительно центра перекладины.
+wooFitClearance = 0.0  # Дополнительный припуск к профилю ПОСЛЕ wooProfileOffset.
 
-lidBorder = 1.15               # Seat width around opening in XZ.
-lidGap = fitGap                # Radial contour clearance PER SIDE.
-lidSeatDepth = 1.1             # Extra rim depth outside useful WOO volume.
-lidAxialGap = fitGap           # Gap above seat in assembled position.
-lidWingLength = 16.0           # Room for the longitudinal release beam outside WOO.
-lidWingH = 11.0                # Wider wing for the in-plane U-slot and edge catch.
-lidWingR = 1.0
-enableSnapFits = True          # One LEFT rigid tongue + one RIGHT releasable catch.
-snapLength = 12.0              # FREE beam length along X, parallel to the cover.
-snapThickness = 1.2            # Tip thickness along Z; beam flexes toward -Z.
-snapRootThickness = 1.8        # Taper from thick root to thinner tip.
-snapWidth = gripD/2-(wooHalfDepth-lidSeatDepth+lidAxialGap)  # Full lid thickness; no stepped back pocket.
-snapRootLength = 2.0
-snapHook = 0.45                # Engagement beyond the seat edge, toward +Z.
-snapHookLength = 2.5           # Hook length along X at the free end.
-snapRamp = 1.0                 # Both hook ramps: enough run for <=45-degree growth.
-snapTipLand = 0.4
-snapClearance = fitGap
-snapFlexSpace = 0.85           # Lower U-slot gap; remaining cover limits travel.
-snapUpperGap = fitGap          # Upper U-slot gap.
-snapTipGap = fitGap            # Free-end U-slot gap.
-snapEdgeRail = 1.0             # Cover strip outside upper slot, opened at hook.
-mechanismKeepout = 0.8         # Separation from maximum WOO profile width.
-tongueEngagement = 1.2         # Short tuck-in engagement; rigid tongue, not a snap.
-tongueThickness = 1.6
-tongueTipThickness = 0.8       # Thin leading tip with a second insertion bevel.
-tongueWidth = 5.0
-tongueRootLength = 3.0
-tongueClearance = fitGap       # Nominal clearance per side in the tongue pocket.
-tongueMotionSteps = 12         # Construction samples for the pocket's motion envelope.
-lidTiltAngle = 2.0             # Smaller planned tilt for the tighter edge clearance.
-lidTiltClearance = fitGap      # Clearance at the left pivot edge.
-pryD = 2.5                    # Recess at wing edge to lift the cover.
-minimumWall = 1.5              # Geometry guard, not a strength certification.
+lidBorder = 1.15  # Ширина бортика вокруг полости в плоскости XZ.
+lidGap = fitGap  # Зазор по контуру крышки на сторону.
+lidSeatDepth = 1.1  # Заглубление бортика относительно полезного объёма WOO.
+lidAxialGap = fitGap  # Зазор над посадкой по Y в закрытом положении.
+lidWingLength = 16.0  # Длина боковых участков для креплений за пределами полости.
+lidWingH = 11.0  # Высота боковых участков крышки по Z.
+lidWingR = 1.0  # Радиус углов боковых участков.
+enableSnapFits = True  # Добавить жёсткий язычок слева и отжимную защёлку справа.
+snapLength = 12.0  # Свободная длина упругого язычка вдоль X.
+snapThickness = 1.2  # Толщина свободного конца по Z; отжим к -Z.
+snapRootThickness = 1.8  # Толщина у корня; к свободному концу язычок сужается.
+snapWidth = gripD/2-(wooHalfDepth-lidSeatDepth+lidAxialGap)  # Вычисляемая глубина язычка по Y: вся толщина крышки, без уступа.
+snapRootLength = 2.0  # Длина закреплённого участка у корня защёлки.
+snapHook = 0.45  # Выступ зуба за край посадки в сторону +Z.
+snapHookLength = 2.5  # Длина зуба вдоль X у свободного конца.
+snapRamp = 1.0  # Длина каждого скоса зуба для постепенного нарастания при печати.
+snapTipLand = 0.4  # Плоский участок на вершине зуба.
+snapClearance = fitGap  # Посадочный зазор ответного паза зуба.
+snapFlexSpace = 0.85  # Место для отжима под язычком; рабочий ход, не зазор посадки.
+snapUpperGap = fitGap  # Ширина верхней ветви П-образного сквозного паза.
+snapTipGap = fitGap  # Зазор у свободного торца язычка.
+snapEdgeRail = 1.0  # Полоса крышки снаружи верхнего паза; у зуба она раскрывается.
+mechanismKeepout = 0.8  # Отступ крепления от максимальной ширины полости WOO.
+tongueEngagement = 1.2  # Глубина захода жёсткого левого язычка в карман.
+tongueThickness = 1.6  # Толщина жёсткого язычка по Y у основания.
+tongueTipThickness = 0.8  # Толщина его переднего конца: скос облегчает заход.
+tongueWidth = 5.0  # Ширина жёсткого язычка по Z.
+tongueRootLength = 3.0  # Длина соединения жёсткого язычка с крышкой по X.
+tongueClearance = fitGap  # Зазор на сторону в кармане жёсткого язычка.
+tongueMotionSteps = 12  # Число положений для построения огибающей кармана при наклоне.
+lidTiltAngle = 2.0  # Расчётный угол наклона крышки при снятии, градусы.
+lidTiltClearance = fitGap  # Зазор у левого поворотного края крышки.
+pryD = 2.5  # Диаметр выемки для поддевания крышки.
+minimumWall = 1.5  # Минимум для геометрических ограничений, не расчёт прочности.
 
-makeFitSample = False         # Extra pair cropped from right catch/receiver.
-sampleWidth = 18.0             # Includes ENTIRE beam and its fixed root.
-sampleHeight = 18.0            # Includes the edge hook, U-slot and stop.
-exportFiles = True            # Local F3D + separate STL files beside script.
-showMessage = True
-modelName = 'KiteHandle_WOO'
-geometryTolerance = 0.02       # Verification tolerance, mm.
-# ================= END OF EDITABLE SETTINGS ==================
+makeFitSample = False  # Создать отдельные фрагменты крепления для пробной печати.
+sampleWidth = 18.0  # Ширина фрагмента по X, включая весь язычок и корень.
+sampleHeight = 18.0  # Высота фрагмента по Z, включая зуб и П-паз.
+exportFiles = True  # Сохранить F3D и отдельные STL рядом со скриптом.
+showMessage = True  # Показать итоговое окно после построения.
+modelName = 'KiteHandle_WOO'  # Имя архива модели и заголовок сообщений.
+geometryTolerance = 0.02  # Допуск встроенных проверок размеров, мм.
+# ================= КОНЕЦ ИЗМЕНЯЕМЫХ НАСТРОЕК =================
 
 import math
 import os
@@ -90,14 +101,18 @@ import adsk.core
 import adsk.fusion
 
 
+# ЕДИНИЦЫ И API.
+# Создать точку, переведя миллиметры в сантиметры Fusion.
 def p(x, y, z):
     return adsk.core.Point3D.create(x / 10, y / 10, z / 10)
 
 
+# Передать размер в Fusion с явно указанными единицами мм.
 def val(mm):
     return adsk.core.ValueInput.createByString(f'{mm:.12g} mm')
 
 
+# Преобразовать список Python в коллекцию объектов Fusion.
 def collection(items):
     result = adsk.core.ObjectCollection.create()
     for item in items:
@@ -105,11 +120,15 @@ def collection(items):
     return result
 
 
+# Остановить построение с объяснением, если условие не выполнено.
 def check(condition, message):
     if not condition:
         raise ValueError(message)
 
 
+# КОНТУРЫ.
+# Скруглить выпуклый многоугольник с обходом против часовой стрелки.
+# Два элемента задают отрезок, три — дугу (начало, промежуточная точка, конец).
 def rounded_polygon(vertices, radii):
     """Return lines/arcs for a convex CCW polygon, all in mm.
     Arc representation is (start, midpoint, end); line is (start, end).
@@ -146,6 +165,7 @@ def rounded_polygon(vertices, radii):
     return result
 
 
+# Выпуклая оболочка точек: внешний контур для кармана язычка.
 def convex_hull(points):
     """CCW supporting polygon for a set of 2D construction points."""
     points = sorted(set(points))
@@ -163,6 +183,8 @@ def convex_hull(points):
     return lower[:-1]+upper[:-1]
 
 
+# Карман охватывает положения язычка при наклоне и сдвиге.
+# Добавляется запас между отсчётами дуги; это построение, не симуляция всей сборки.
 def tongue_pocket_outline(tongue_xy,pivot_x,pivot_y):
     """Clear the tongue's tilt-then-slide route, not just its closed pose.
     The opposite lid edge is lifted first; the tongue then slides out in +X.
@@ -185,6 +207,8 @@ def tongue_pocket_outline(tongue_xy,pivot_x,pivot_y):
     return offset_polygon(convex_hull(points),tongueClearance+allowance)
 
 
+# Сдвинуть прямые стороны контура наружу.
+# Радиусы скруглений увеличиваются отдельно на ту же величину.
 def offset_polygon(vertices, distance):
     """Exact supporting-line offset of a convex CCW polygon."""
     result = []
@@ -201,6 +225,8 @@ def offset_polygon(vertices, distance):
     return result
 
 
+# Восстановить профиль WOO по чертежу, затем расширить его на wooProfileOffset.
+# Возвращает вершины XZ, радиусы и сведения о размерах для отчёта.
 def woo_geometry():
     """Solve rounded six-vertex contour from screenshot dimensions.
     Top R1 chord fixes alpha. Bottom flat and lower line fix beta.
@@ -251,6 +277,8 @@ def woo_geometry():
                          'side_chord_mm':2*wooSideR*math.sin((beta-alpha)/2)}
 
 
+# ЭСКИЗЫ И ТЕЛА.
+# Создать плоскость по точке и нормали и эскиз на ней.
 def sketch_plane(comp, origin, normal, name):
     inp = comp.constructionPlanes.createInput()
     check(inp.setByPlane(adsk.core.Plane.create(p(*origin),
@@ -263,6 +291,7 @@ def sketch_plane(comp, origin, normal, name):
     return sk
 
 
+# Перенести двумерные кривые в эскиз через map_point и получить замкнутый профиль.
 def draw_curves(sk, curves, map_point):
     def point(q):
         return sk.modelToSketchSpace(p(*map_point(q)))
@@ -278,10 +307,13 @@ def draw_curves(sk, curves, map_point):
     return sk.profiles.item(0)
 
 
+# Контур прямоугольника шириной w и высотой h со скруглениями r.
 def rectangle_curves(w, h, r):
     return rounded_polygon([(-w/2,-h/2),(w/2,-h/2),(w/2,h/2),(-w/2,h/2)], [r]*4)
 
 
+# Постоянное симметричное сечение ручки.
+# В режиме печати скосы у плоскостей по Y сочетаются с боковыми дугами.
 def handle_section_curves():
     """Uniform section mirrored about BOTH in-plane axes.
     Y=-gripD/2 and Y=+gripD/2 have identical flat faces and 45-degree
@@ -297,11 +329,13 @@ def handle_section_curves():
     return rounded_polygon(vertices,[0,0,gripR,gripR,0,0,gripR,gripR])
 
 
+# Вспомогательный эскиз сечения в XY; основная ручка строится через handle_blank.
 def section_xy(comp,x,z,w,d,r,name):
     sk = sketch_plane(comp,(0,0,z),(0,0,1),name)
     return draw_curves(sk,rectangle_curves(w,d,r),lambda q:(x+q[0],q[1],z))
 
 
+# Выдавить профиль в новое тело; знак distance выбирает направление.
 def extrude(comp, profile, distance, name):
     inp = comp.features.extrudeFeatures.createInput(profile,
         adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
@@ -315,12 +349,14 @@ def extrude(comp, profile, distance, name):
     return body
 
 
+# Профиль XZ выдавливается вдоль Y от y0 до y1: полость и крышка.
 def prism_xz(comp, curves, y0, y1, name):
     sk = sketch_plane(comp,(0,y0,0),(0,1,0),name)
     profile = draw_curves(sk,curves,lambda q:(q[0],y0,q[1]))
     return extrude(comp,profile,y1-y0,name)
 
 
+# Многоугольник XY выдавливается вдоль Z от z0 до z1.
 def prism_xy(comp, vertices, z0, z1, name):
     sk = sketch_plane(comp,(0,0,z0),(0,0,1),name)
     curves = [(vertices[i],vertices[(i+1)%len(vertices)]) for i in range(len(vertices))]
@@ -328,6 +364,7 @@ def prism_xy(comp, vertices, z0, z1, name):
     return extrude(comp,profile,z1-z0,name)
 
 
+# Многоугольник YZ выдавливается вдоль X от x0 до x1.
 def prism_yz(comp, vertices, x0, x1, name):
     sk = sketch_plane(comp,(x0,0,0),(1,0,0),name)
     curves = [(vertices[i],vertices[(i+1)%len(vertices)]) for i in range(len(vertices))]
@@ -335,10 +372,12 @@ def prism_yz(comp, vertices, x0, x1, name):
     return extrude(comp,profile,x1-x0,name)
 
 
+# Прямоугольный объём по границам X/Y/Z для обрезки и вырезов.
 def box(comp,x0,x1,y0,y1,z0,z1,name):
     return prism_xy(comp,[(x0,y0),(x1,y0),(x1,y1),(x0,y1)],z0,z1,name)
 
 
+# Цилиндр вдоль Z для болтовых отверстий и выемки.
 def cylinder(comp,x,y,z0,z1,diameter,name):
     sk = sketch_plane(comp,(0,0,z0),(0,0,1),name)
     sk.sketchCurves.sketchCircles.addByCenterRadius(sk.modelToSketchSpace(p(x,y,z0)),diameter/20)
@@ -347,6 +386,8 @@ def cylinder(comp,x,y,z0,z1,diameter,name):
     return result
 
 
+# Изменить target с помощью tool, поглотив вспомогательное тело.
+# В Direct Design результат остаётся в target, а Combine может вернуть None; проверяются число тел и связность.
 def boolean(comp, target, tool, operation):
     check(target is not None and target.isValid, 'Invalid Boolean target body.')
     check(tool is not None and tool.isValid, 'Invalid Boolean tool body.')
@@ -373,18 +414,23 @@ def boolean(comp, target, tool, operation):
     return result
 
 
+# Объединить два пересекающихся тела в одно.
 def join(comp,a,b):
     return boolean(comp,a,b,adsk.fusion.FeatureOperations.JoinFeatureOperation)
 
 
+# Вычесть второе тело из первого.
 def cut(comp,a,b):
     return boolean(comp,a,b,adsk.fusion.FeatureOperations.CutFeatureOperation)
 
 
+# Оставить общий объём двух тел.
 def intersect(comp,a,b):
     return boolean(comp,a,b,adsk.fusion.FeatureOperations.IntersectFeatureOperation)
 
 
+# РУЧКА.
+# Найти угол и точки касания дуги с наклонной ножкой и горизонтальной перекладиной.
 def bend_geometry():
     """Find an arc tangent to the straight inclined leg and horizontal grip.
     legLean remains the inward offset at the leg/arc tangency point.
@@ -405,6 +451,8 @@ def bend_geometry():
     return phi,zt,boltSpacing/2-legLean-bendR*math.cos(phi)
 
 
+# Провести одно сечение по пути: ножка — дуга — перекладина — дуга — ножка.
+# Sweep сохраняет сечение без расширений; снизу тело обрезается на Z=0.
 def handle_blank(comp):
     half = boltSpacing/2
     legx = half-legLean
@@ -451,6 +499,8 @@ def handle_blank(comp):
     return body
 
 
+# Встроенные ограничения размеров сечения, полости, болтов и креплений.
+# Выполняются при запуске; это не испытание готовой детали.
 def validate(info, vertices):
     for name in ['boltSpacing','handleTop','gripH','gripD','baseTrimMargin',
                  'boltD','headPocketD','shoulder','wooHalfDepth','snapLength','snapThickness']:
@@ -523,6 +573,9 @@ def validate(info, vertices):
               tongueClearance+minimumWall < tangentx,'Left tongue reaches the handle bend.')
 
 
+# КРЫШКА.
+# Центральный контур плюс два боковых участка креплений.
+# Функция строит и крышку, и посадку с разными смещениями и глубиной.
 def make_cover_outline(comp,vertices,radii,offset,y0,y1,wing_start,wing_end,zc,name):
     body = prism_xz(comp,rounded_polygon(offset_polygon(vertices,offset),[r+offset for r in radii]),y0,y1,name)
     for sign in [-1,1]:
@@ -533,6 +586,8 @@ def make_cover_outline(comp,vertices,radii,offset,y0,y1,wing_start,wing_end,zc,n
     return body
 
 
+# Справа создаётся упругий язычок в сквозном П-пазу и зуб со скосами.
+# Слева — жёсткий язычок с подкосом и карман для захода под наклоном.
 def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y):
     """Integral in-plane beam in a through U-slot; left tongue has a gusset.
     Print with +Y facing the bed: the lid AND beam start at Y=gripD/2.
@@ -631,6 +686,8 @@ def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y):
                          'planned_opening_angle_deg':lidTiltAngle}
 
 
+# ОТЧЁТ.
+# Получить связность, объём в мм3 и границы тела в мм.
 def report_body(body):
     bb = body.boundingBox
     return {'solid':body.isSolid,'lumps':body.lumps.count,'volume_mm3':body.volume*1000,
@@ -638,6 +695,9 @@ def report_body(body):
                          [bb.maxPoint.x*10,bb.maxPoint.y*10,bb.maxPoint.z*10]]}
 
 
+# ГЛАВНАЯ ПОСЛЕДОВАТЕЛЬНОСТЬ.
+# Fusion вызывает run при запуске.
+# Переменная stage хранит текущий этап для сообщения об ошибке.
 def run(context):
     app = adsk.core.Application.get()
     ui = app.userInterface
@@ -645,11 +705,13 @@ def run(context):
     stage = 'Validate settings'
     report = {}
     try:
+        # 1. Рассчитать профиль полости и проверить допустимость настроек.
         vertices,radii,info = woo_geometry()
         validate(info,vertices)
         report['woo_profile'] = info
         report['settings'] = {k:v for k,v in globals().items() if not k.startswith('_') and isinstance(v,(int,float,bool,str))}
         report['settings'].pop('folder',None)
+        # 2. Создать новый документ и отдельный компонент ручки.
         app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
         design = adsk.fusion.Design.cast(app.activeProduct)
         design.designType = adsk.fusion.DesignTypes.DirectDesignType
@@ -661,14 +723,18 @@ def run(context):
         comp = occurrence.component
         comp.name = 'Handle'
         stage = 'Build handle'
+        # 3. Построить ручку и сохранить копию её исходной поверхности.
+        # Эта копия позже ограничит крышку, чтобы она точно повторяла ручку.
         handle = handle_blank(comp)
         # Saved pristine skin is the source for the EXACT flush cover surface.
         skin = adsk.fusion.TemporaryBRepManager.get().copy(handle)
         stage = 'Bolt bores and head access'
+        # 4. Два сквозных отверстия и углубления под головки с опорой shoulder.
         for sign in [-1,1]:
             handle = cut(comp,handle,cylinder(comp,sign*boltSpacing/2,0,-1,handleTop+1,boltD,'M6_bore'))
             handle = cut(comp,handle,cylinder(comp,sign*boltSpacing/2,0,shoulder,handleTop+1,headPocketD,'M6_head_access'))
         stage = 'WOO cavity and cover seat'
+        # 5. Полость открывается к +Y; расширенная неглубокая посадка окружает её.
         cavity_curves = rounded_polygon(offset_polygon(vertices,wooFitClearance),[r+wooFitClearance for r in radii])
         # Open to +Y; cover closes it at Y=+wooHalfDepth.
         handle = cut(comp,handle,prism_xz(comp,cavity_curves,-wooHalfDepth,gripD,'WOO_opening'))
@@ -680,15 +746,19 @@ def run(context):
                                   seat_y,gripD,wing_start,wing_end,zc,'Cover_seat')
         handle = cut(comp,handle,seat)
         # Cover starts deeper at the rim; WOO envelope is subtracted below.
+        # 6. Заготовка крышки: обрезать по исходной поверхности ручки,
+        # затем убрать с обратной стороны материал из полезного объёма датчика.
         cover = make_cover_outline(comp,vertices,radii,wooFitClearance+lidBorder,
                                    seat_y+lidAxialGap,gripD,wing_start,wing_end,zc,'Cover_stock')
         cover = intersect(comp,cover,comp.bRepBodies.add(skin))
         cover = cut(comp,cover,prism_xz(comp,cavity_curves,-gripD,wooHalfDepth,'Cover_inner_clearance'))
         stage = 'Rigid tongue and accessible release catch'
+        # 7. Добавить крепления крышки и соответствующие карманы в ручке.
         if enableSnapFits:
             handle,cover,lock_info = releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y)
             report['cover_lock'] = lock_info
         stage = 'Finger/tool release recess'
+        # 8. Добавить доступ для поддевания крышки у края.
         # Vertical small cylinder at outer right wing edge, recessed in front skin.
         pry = cylinder(comp,wing_end+wooFitClearance+lidBorder,gripD/2,
                        zc-pryD/2,zc+pryD/2,pryD,'Lift_recess')
@@ -696,6 +766,8 @@ def run(context):
         handle.name = 'Handle'
         cover.name = 'Cover'
         stage = 'Check solids and assembled clearances'
+        # 9. При запуске проверить целостность, высоту и пересечение деталей.
+        # Проверяется закрытая сборка, а не вся траектория установки и снятия.
         report['handle'] = report_body(handle)
         report['cover'] = report_body(cover)
         for body in [handle,cover]:
@@ -708,6 +780,7 @@ def run(context):
         check(ok,'Could not verify cover interference.')
         report['overlap_mm3'] = overlap.volume*1000
         check(overlap.volume < 0.00001,'Cover interferes with handle; check catch relief.')
+        # 10. При необходимости выделить образцы крепления для пробной печати.
         if makeFitSample and enableSnapFits:
             stage = 'Fit sample'
             sx = lock_info['sample_center_x']
@@ -723,6 +796,7 @@ def run(context):
                 matrix = adsk.core.Matrix3D.create()
                 matrix.translation = adsk.core.Vector3D.create((boltSpacing/2+gripD-sx)/10,0,-(zc-sampleHeight/2)/10)
                 sample_occ.transform2 = matrix
+        # 11. Перенести крышку в свой компонент для отдельного STL.
         cover_occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
         cover_occ.component.name = 'Cover'
         cover = cover.moveToComponent(cover_occ)
@@ -732,6 +806,7 @@ def run(context):
             for plane in component.constructionPlanes:
                 plane.isLightBulbOn = False
         stage = 'Export'
+        # 12. Сохранить отдельные STL и общую модель F3D рядом со скриптом.
         if exportFiles:
             manager = design.exportManager
             for component,name in [(comp,'Handle'),(cover_occ.component,'Cover')]:
@@ -739,6 +814,7 @@ def run(context):
                 opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
                 check(manager.execute(opt),'STL export failed: '+name)
             check(manager.execute(manager.createFusionArchiveExportOptions(os.path.join(folder,modelName+'.f3d'))),'F3D export failed.')
+        # 13. Настроить вид, записать JSON-отчёт и показать результат.
         camera = app.activeViewport.camera
         camera.eye = p(130,210,135)
         camera.target = p(0,0,handleTop/2)
@@ -759,6 +835,7 @@ def run(context):
                  else 'Крышка без защёлок: сохранён посадочный бортик, фиксации нет.\n')+
                 'STL/F3D и отчёт: '+folder,modelName+' v'+scriptVersion)
     except Exception:
+        # Сохранить этап и полный traceback, чтобы найти причину сбоя.
         report['status'] = 'FAIL'
         report['stage'] = stage
         report['error'] = traceback.format_exc()
@@ -767,5 +844,6 @@ def run(context):
         ui.messageBox('Версия: '+scriptVersion+'\nОшибка на этапе: '+stage+'\n\n'+traceback.format_exc(),modelName+' v'+scriptVersion)
 
 
+# Завершение скрипта: постоянных обработчиков событий здесь нет.
 def stop(context):
     pass
