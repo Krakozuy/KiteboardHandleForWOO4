@@ -17,8 +17,8 @@ API хранит координаты в см: перевод выполняет
 """
 
 # ==================== SETTINGS / НАСТРОЙКИ ====================
-scriptVersion = '1.0.28'       # Версия повышается при каждом обновлении.
-fitGap = 0.20  # Общий посадочный зазор НА СТОРОНУ, мм.
+scriptVersion = '1.0.29'       # Версия повышается при каждом обновлении.
+fitGap = 0.15  # Общий посадочный зазор НА СТОРОНУ, мм.
 boltSpacing = 180.0  # Межцентровое расстояние крепёжных болтов по X.
 handleTop = 72.0  # Полная высота от поверхности доски.
 gripH = 28.0  # Размер постоянного сечения поперёк оси ручки, включая ножки.
@@ -73,13 +73,13 @@ snapThickness = 1.4  # Толщина свободного конца по Z; о
 snapRootThickness = 2.0  # Толщина у корня; к свободному концу язычок сужается.
 snapWidth = gripD/2-(wooHalfDepth-lidSeatDepth+lidAxialGap)  # Вычисляемая глубина язычка по Y: вся толщина крышки, без уступа.
 snapRootLength = 2.0  # Длина закреплённого участка у корня защёлки.
-snapHook = 0.75  # Глубина обоих зубьев за край посадки: верхний к +Z, нижний к -Z.
+snapHook = 0.6  # Глубина обоих зубьев за край посадки: верхний к +Z, нижний к -Z.
 snapHookLength = 2.5  # Длина зуба вдоль X у свободного конца.
 snapRamp = 1.1  # Минимальная длина каждого скоса по Y; при необходимости увеличивается автоматически.
 snapTipLand = 0.4  # Плоский участок на вершине зуба.
 snapClearance = 0.2  # Зазор НА СТОРОНУ: с обеих сторон стойки каждого зуба по X и в ответном гнезде.
 # Вычисляемая длина: скос не короче подъёма зуба, чтобы сохранить уклон до 45°.
-# При snapClearance=0.2 и остальных стандартных размерах получается 1.15 мм.
+# При увеличении глубины зуба или зазора скос автоматически удлиняется.
 snapRampEffective = max(snapRamp, lidGap+snapHook+snapClearance)
 snapFlexSpace = 0.85  # Место для отжима под язычком; рабочий ход, не зазор посадки.
 snapUpperGap = snapFlexSpace  # Верхний зазор по Z равен нижнему: 0.85 мм.
@@ -94,16 +94,17 @@ tongueClearance = fitGap  # Зазор на сторону в кармане ж�
 tongueMotionSteps = 12  # Число положений для построения огибающей кармана при наклоне.
 lidTiltAngle = 2.0  # Расчётный угол наклона крышки при снятии, градусы.
 lidTiltClearance = fitGap  # Зазор у левого поворотного края крышки.
-pryWidth = 10.0  # Ширина входа ложбинки по Z на наружной плоскости ручки.
-pryLength = 16.0  # Длина плавного подхода по X от края под крышкой наружу.
+pryWidth = 14.0  # Ширина входа ложбинки по Z: больше места для подушечки пальца.
+pryLength = 13.0  # Длина плавного подхода по X от края под крышкой наружу.
 pryUnderlap = 0.8  # Заход ложбинки под исходный торец крышки по X.
-pryDepth = 6.5  # Максимальная глубина ложбинки ОТ НАРУЖНОЙ поверхности по Y.
+pryDepth = gripD/2-(wooHalfDepth-lidSeatDepth+lidAxialGap)  # Вычисляемая глубина до внутренней плоскости края крышки; сейчас 4 мм.
 pryBowlCenterRatio = 0.75  # Форма эллипсоидального дна: смещение центра / радиус по Y.
 pryLipWidth = 6.0  # Ширина округлой полочки крышки по Z.
 pryLipProjection = 1.8  # Выступ полочки по X в ложбинку, ниже поверхности хвата.
 pryLipThickness = 2.4  # Толщина полочки по Y.
 pryLipRoot = 1.5  # Перекрытие полочки с исходным краем крышки по X.
 pryLipR = 0.8  # Скругления полочки в проекциях XY и XZ.
+pryLipMinClearance = 0.6  # Минимальный просвет под полочкой; отдельно от толщины несущих стенок.
 minimumWall = 1.5  # Минимум для геометрических ограничений, не расчёт прочности.
 
 makeFitSample = False  # Создать отдельные фрагменты крепления для пробной печати.
@@ -560,9 +561,13 @@ def validate(info, vertices):
     check(abs(wooZOffset)+info['height_mm']/2+wooFitClearance+lidBorder+lidGap < gripH/2,'Cover seat does not fit grip height.')
     check(lidGap > 0 and lidBorder > lidGap and lidSeatDepth > lidAxialGap,'Invalid lid seat/gap.')
     wing_half = lidWingH/2+wooFitClearance+lidBorder
-    check(0 < pryWidth/2 < wing_half-minimumWall,
-          'Ложбинка слишком широкая: оставьте материал до верхнего и нижнего гнезда.')
-    check(0 < pryDepth < gripD-minimumWall and 0 < pryUnderlap < lidWingLength,
+    # Ложбинка расположена за торцом крышки, поэтому может быть шире её крыла.
+    # Гнёзда защищены ограничением захода по X ниже; по Z сохраняем боковые стенки ручки.
+    check(0 < pryWidth/2 and abs(wooZOffset)+pryWidth/2+minimumWall < gripH/2,
+          'Ложбинка слишком широкая: уменьшите pryWidth, чтобы сохранить края ручки.')
+    cover_inner_y = wooHalfDepth-lidSeatDepth+lidAxialGap
+    check(0 < pryDepth <= gripD/2-cover_inner_y and
+          pryDepth < gripD-minimumWall and 0 < pryUnderlap < lidWingLength,
           'Недопустимая глубина ложбинки или заход под крышку.')
     check(pryLength > pryDepth and 0 < pryBowlCenterRatio < 1,
           'Подход ложбинки должен быть длиннее глубины; коэффициент формы должен быть между 0 и 1.')
@@ -578,8 +583,10 @@ def validate(info, vertices):
     lip_q = 1-((pryUnderlap+pryLipProjection)/bowl_rx)**2-(pryLipWidth/(2*bowl_rz))**2
     check(lip_q > 0,'Полочка выходит за пределы ложбинки.')
     lip_floor = gripD/2+bowl_ry*pryBowlCenterRatio-bowl_ry*math.sqrt(lip_q)
-    check(gripD/2-pryLipThickness-lip_floor >= minimumWall,
-          'Под полочкой слишком мало места для захвата: углубите или расширьте ложбинку.')
+    # Это свободное место для подцепления, а не толщина стенки: minimumWall здесь не применяем.
+    check(pryLipMinClearance > 0 and
+          gripD/2-pryLipThickness-lip_floor >= pryLipMinClearance,
+          'Под полочкой недостаточный просвет: расширьте ложбинку или уменьшите толщину полочки.')
     if enableSnapFits:
         check(0 < snapClearance < snapHook < snapFlexSpace,'Invalid latch engagement/release travel.')
         check(snapRootThickness >= snapThickness > 0 and snapRootLength > snapFlexSpace/2,
@@ -811,9 +818,10 @@ def finger_scoop(comp,handle,cover,wing_end,zc):
     ry = pryDepth/(1-pryBowlCenterRatio)
     cy = outer_y+ry*pryBowlCenterRatio
     scoop = ellipsoid_body(comp,(start_x,cy,zc),rx,ry,rz,'Finger_scoop_ellipsoid')
-    # Отсекается половина за крышкой, чтобы сохранить её механизм и камеру.
-    # Левая граница утоплена под край и не является входной стенкой для пальца.
-    mask = box(comp,start_x,start_x+pryLength+geometryTolerance,-gripD,cy+ry+geometryTolerance,
+    # Ограничиваем заход под крышку по X и глубину её внутренней плоскостью по Y.
+    # Дно эллипсоида касается этой плоскости: лишнего кармана за крышкой нет.
+    cover_inner_y = wooHalfDepth-lidSeatDepth+lidAxialGap
+    mask = box(comp,start_x,start_x+pryLength+geometryTolerance,cover_inner_y,cy+ry+geometryTolerance,
                zc-rz-geometryTolerance,zc+rz+geometryTolerance,'Finger_scoop_limit')
     scoop = intersect(comp,scoop,mask)
     handle = cut(comp,handle,scoop)
@@ -832,6 +840,8 @@ def finger_scoop(comp,handle,cover,wing_end,zc):
     cover = join(comp,cover,lip)
     return handle,cover,{'type':'curved ellipsoidal scoop with rounded pull lip',
                          'length_mm':pryLength,'width_mm':pryWidth,'depth_mm':pryDepth,
+                         'floor_limit_y_mm':cover_inner_y,
+                         'lip_min_clearance_mm':pryLipMinClearance,
                          'lip_projection_mm':pryLipProjection,'lip_thickness_mm':pryLipThickness}
 
 # TPU-ПРОСТАВКИ. Копируем плоский торец ножки после обрезки на Z=0.
