@@ -17,7 +17,7 @@ API хранит координаты в см: перевод выполняет
 """
 
 # ==================== SETTINGS / НАСТРОЙКИ ====================
-scriptVersion = '1.0.29'       # Версия повышается при каждом обновлении.
+scriptVersion = '1.0.30'       # Версия повышается при каждом обновлении.
 fitGap = 0.15  # Общий посадочный зазор НА СТОРОНУ, мм.
 boltSpacing = 180.0  # Межцентровое расстояние крепёжных болтов по X.
 handleTop = 72.0  # Полная высота от поверхности доски.
@@ -94,11 +94,12 @@ tongueClearance = fitGap  # Зазор на сторону в кармане ж�
 tongueMotionSteps = 12  # Число положений для построения огибающей кармана при наклоне.
 lidTiltAngle = 2.0  # Расчётный угол наклона крышки при снятии, градусы.
 lidTiltClearance = fitGap  # Зазор у левого поворотного края крышки.
-pryWidth = 14.0  # Ширина входа ложбинки по Z: больше места для подушечки пальца.
+pryWidth = 14.0  # Максимальная ширина ложбинки по Z; у крышки она автоматически сужается.
 pryLength = 13.0  # Длина плавного подхода по X от края под крышкой наружу.
 pryUnderlap = 0.8  # Заход ложбинки под исходный торец крышки по X.
 pryDepth = gripD/2-(wooHalfDepth-lidSeatDepth+lidAxialGap)  # Вычисляемая глубина до внутренней плоскости края крышки; сейчас 4 мм.
-pryBowlCenterRatio = 0.75  # Форма эллипсоидального дна: смещение центра / радиус по Y.
+pryBowlCenterRatio = 0.25  # Форма дна: более пологое дно сохраняет просвет под полочкой у сужения.
+pryNeckInset = 0.15  # Насколько боковые края скрытого конца выемки заходят внутрь контура крышки по Z.
 pryLipWidth = 6.0  # Ширина округлой полочки крышки по Z.
 pryLipProjection = 1.8  # Выступ полочки по X в ложбинку, ниже поверхности хвата.
 pryLipThickness = 2.4  # Толщина полочки по Y.
@@ -522,6 +523,28 @@ def handle_blank(comp):
     return body
 
 
+# Общий расчёт выемки для построения и проверки просвета под полочкой.
+def finger_scoop_geometry():
+    """Размеры единого эллипсоида: широкий вход с концом, скрытым под крышкой."""
+    radius = lidWingR+wooFitClearance+lidBorder
+    wing_half = lidWingH/2+wooFitClearance+lidBorder
+    # Полуширина скруглённого крыла точно на плоскости обрезки выемки по X.
+    if pryUnderlap < radius:
+        end_half = wing_half-radius+math.sqrt(2*radius*pryUnderlap-pryUnderlap**2)
+    else:
+        end_half = wing_half
+    check(0 < pryNeckInset < end_half,'Недопустимый заход боковых краёв выемки под крышку.')
+    neck_half = min(pryWidth/2,end_half-pryNeckInset)
+    # Смещаем максимум ширины наружу. Сечение у обрезки сужается до neck_half,
+    # а наружный конец остаётся на прежнем расстоянии pryLength от обрезки.
+    ratio = math.sqrt(max(0.0,1-(2*neck_half/pryWidth)**2))
+    front_length = pryLength/(1+ratio)
+    center_shift = pryLength-front_length
+    factor = math.sqrt(1-pryBowlCenterRatio**2)
+    return (center_shift,front_length/factor,pryDepth/(1-pryBowlCenterRatio),
+            pryWidth/(2*factor),neck_half)
+
+
 # Встроенные ограничения размеров сечения, полости, болтов и креплений.
 # Выполняются при запуске; это не испытание готовой детали.
 def validate(info, vertices):
@@ -576,11 +599,18 @@ def validate(info, vertices):
           'Недопустимые размеры полочки для захвата.')
     check(0 < pryLipR < min(pryLipRoot+pryLipProjection,pryLipWidth,pryLipThickness)/2,
           'Радиус полочки слишком большой.')
-    # Оценка доступного места под нижними углами полочки по поверхности эллипсоида.
-    bowl_factor = math.sqrt(1-pryBowlCenterRatio**2)
-    bowl_rx, bowl_rz = pryLength/bowl_factor, pryWidth/(2*bowl_factor)
-    bowl_ry = pryDepth/(1-pryBowlCenterRatio)
-    lip_q = 1-((pryUnderlap+pryLipProjection)/bowl_rx)**2-(pryLipWidth/(2*bowl_rz))**2
+    shift,bowl_rx,bowl_ry,bowl_rz,neck_half = finger_scoop_geometry()
+    # Под корнем полочки уже вырезана посадка крышки. Проверяем только часть,
+    # выступающую за посадку; учитываем её скругление на крайних Z полочки.
+    seat_radius = lidWingR+wooFitClearance+lidBorder+lidGap
+    corner_z = max(0.0,pryLipWidth/2-(lidWingH/2-lidWingR))
+    check(corner_z < seat_radius,'Полочка слишком широкая для посадки крышки.')
+    exposed_start = max(0.0,pryUnderlap+lidGap-seat_radius+
+                        math.sqrt(seat_radius**2-corner_z**2))
+    exposed_end = pryUnderlap+pryLipProjection
+    check(exposed_start < exposed_end,'Полочка не выступает за посадку крышки.')
+    farthest_x = max(abs(exposed_start-shift),abs(exposed_end-shift))
+    lip_q = 1-(farthest_x/bowl_rx)**2-(pryLipWidth/(2*bowl_rz))**2
     check(lip_q > 0,'Полочка выходит за пределы ложбинки.')
     lip_floor = gripD/2+bowl_ry*pryBowlCenterRatio-bowl_ry*math.sqrt(lip_q)
     # Это свободное место для подцепления, а не толщина стенки: minimumWall здесь не применяем.
@@ -813,13 +843,12 @@ def finger_scoop(comp,handle,cover,wing_end,zc):
     edge_x = wing_end+wooFitClearance+lidBorder
     start_x = edge_x-pryUnderlap
     outer_y = gripD/2
-    factor = math.sqrt(1-pryBowlCenterRatio**2)
-    rx, rz = pryLength/factor, pryWidth/(2*factor)
-    ry = pryDepth/(1-pryBowlCenterRatio)
+    shift,rx,ry,rz,neck_half = finger_scoop_geometry()
     cy = outer_y+ry*pryBowlCenterRatio
-    scoop = ellipsoid_body(comp,(start_x,cy,zc),rx,ry,rz,'Finger_scoop_ellipsoid')
+    scoop = ellipsoid_body(comp,(start_x+shift,cy,zc),rx,ry,rz,'Finger_scoop_ellipsoid')
     # Ограничиваем заход под крышку по X и глубину её внутренней плоскостью по Y.
-    # Дно эллипсоида касается этой плоскости: лишнего кармана за крышкой нет.
+    # Концевое сечение теперь целиком внутри посадки: плоский срез не оставляет
+    # видимой ступеньки сверху и снизу. Дно не уходит глубже внутренней плоскости крышки.
     cover_inner_y = wooHalfDepth-lidSeatDepth+lidAxialGap
     mask = box(comp,start_x,start_x+pryLength+geometryTolerance,cover_inner_y,cy+ry+geometryTolerance,
                zc-rz-geometryTolerance,zc+rz+geometryTolerance,'Finger_scoop_limit')
@@ -841,6 +870,7 @@ def finger_scoop(comp,handle,cover,wing_end,zc):
     return handle,cover,{'type':'curved ellipsoidal scoop with rounded pull lip',
                          'length_mm':pryLength,'width_mm':pryWidth,'depth_mm':pryDepth,
                          'floor_limit_y_mm':cover_inner_y,
+                         'neck_width_mm':2*neck_half,'bowl_center_shift_mm':shift,
                          'lip_min_clearance_mm':pryLipMinClearance,
                          'lip_projection_mm':pryLipProjection,'lip_thickness_mm':pryLipThickness}
 
