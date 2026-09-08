@@ -17,7 +17,7 @@ API хранит координаты в см: перевод выполняет
 """
 
 # ==================== SETTINGS / НАСТРОЙКИ ====================
-scriptVersion = '1.0.32'       # Версия повышается при каждом обновлении.
+scriptVersion = '1.0.33'       # Версия повышается при каждом обновлении.
 fitGap = 0.1  # Общий посадочный зазор НА СТОРОНУ, мм.
 boltSpacing = 180.0  # Межцентровое расстояние крепёжных болтов по X.
 handleTop = 72.0  # Полная высота от поверхности доски.
@@ -75,6 +75,7 @@ snapWidth = gripD/2-(wooHalfDepth-lidSeatDepth+lidAxialGap)  # Вычисляе�
 snapRootLength = 2.0  # Длина закреплённого участка у корня защёлки.
 snapHook = 0.75  # Глубина обоих зубьев за край посадки: верхний к +Z, нижний к -Z.
 snapHookLength = 2.5  # Длина зуба вдоль X у свободного конца.
+snapYInset = 1.0  # Смещение обоих рабочих зубьев и гнёзд от наружной поверхности к центру по -Y; 0 отключает.
 snapRamp = 1.1  # Минимальная длина каждого скоса по Y; при необходимости увеличивается автоматически.
 snapTipLand = 0.4  # Плоский участок на вершине зуба.
 snapClearance = 0.2  # Зазор НА СТОРОНУ: с обеих сторон стойки каждого зуба по X и в ответном гнезде.
@@ -622,10 +623,15 @@ def validate(info, vertices):
         check(snapRootThickness >= snapThickness > 0 and snapRootLength > snapFlexSpace/2,
               'Invalid tapered beam/root dimensions.')
         check(snapRamp > 0,'Минимальная длина скоса snapRamp должна быть положительной.')
-        check(snapWidth > 2*snapRampEffective+snapTipLand and
+        check(snapYInset >= 0 and (snapYInset == 0 or snapYInset > snapClearance),
+              'Смещение по Y должно быть нулевым либо больше snapClearance, чтобы перед пазом оставалась стенка.')
+        check(snapWidth > snapYInset+2*snapRampEffective+snapTipLand and
               snapWidth <= gripD/2-(wooHalfDepth-lidSeatDepth+lidAxialGap)+geometryTolerance,
-              'В толщине крышки не помещаются оба автоматически рассчитанных скоса зуба: '
-              'уменьшите snapRamp, snapHook или snapClearance либо увеличьте толщину крышки.')
+              'В толщине крышки не помещается смещённый по Y зуб с обоими скосами: '
+              'уменьшите snapYInset, snapRamp, snapHook или snapClearance либо увеличьте толщину крышки.')
+        check(gripD/2-snapYInset-2*snapRampEffective-snapTipLand-snapClearance >=
+              wooHalfDepth-lidSeatDepth,
+              'Смещённое гнездо уходит за дно посадки: уменьшите snapYInset или размеры зуба.')
         check(0 < snapHookLength < snapLength and mechanismKeepout > snapClearance,
               'Invalid hook length or WOO keepout.')
         check(snapHookLength+snapClearance < snapLength,
@@ -643,7 +649,7 @@ def validate(info, vertices):
         check(lidWingLength+wooFitClearance+lidBorder-pryUnderlap >
               mechanismKeepout+snapRootLength+snapLength+snapClearance,
               'Выемка под палец заходит в гнёзда защёлок: уменьшите pryUnderlap.')
-        # All of the latch must start on the same flat outer print face.
+        # Зубья и их опорные основания должны оставаться в пределах плоского участка крышки.
         flat_half = gripH/2-(sectionChamfer if printFriendlySection else gripR)
         check(abs(wooZOffset)+wing_half+lidGap+snapHook+snapClearance < flat_half,
               'Edge catch reaches the curved outer skin; reduce lidWingH or hook size.')
@@ -733,10 +739,13 @@ def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y):
     # При подъёме крышки скосы зубьев направляют верхнюю балку к -Z, нижнюю к +Z.
     base_z = edge_z-snapClearance
     peak_z = edge_z+lidGap+snapHook
-    nose_y = outer_y-2*snapRampEffective-snapTipLand
-    hook_profile = [(nose_y,beam_top-snapClearance),(outer_y,beam_top-snapClearance),
-                    (outer_y,base_z),(outer_y-snapRampEffective,peak_z),
-                    (outer_y-snapRampEffective-snapTipLand,peak_z),(nose_y,base_z)]
+    # Обе защёлки находятся на стороне +Y, поэтому обе смещаем к -Y.
+    # Отражение нижней защёлки меняет только Z; её глубина по Y та же.
+    hook_outer_y = outer_y-snapYInset
+    nose_y = hook_outer_y-2*snapRampEffective-snapTipLand
+    hook_profile = [(nose_y,beam_top-snapClearance),(hook_outer_y,beam_top-snapClearance),
+                    (hook_outer_y,base_z),(hook_outer_y-snapRampEffective,peak_z),
+                    (hook_outer_y-snapRampEffective-snapTipLand,peak_z),(nose_y,base_z)]
     notch_profile = offset_polygon(hook_profile,snapClearance)
     for sign, label in [(1,'Upper'),(-1,'Lower')]:
         def mirror_point(point):
@@ -760,6 +769,16 @@ def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y):
         # Оба скоса сохранены: заход при закрытии и выход при подъёме пальцем.
         hook = prism_yz(comp,tooth,end_x-snapHookLength,end_x,label+'_Release_hook')
         cover = join(comp,cover,hook)
+        if snapYInset > 0:
+            # Низ стойки доводим до печатной плоскости +Y. Он остаётся ниже края
+            # посадки и не вырезает наружную стенку ручки. Рабочие скосы над ним
+            # смещены вглубь, но при печати растут от основания, а не из воздуха.
+            support_z0,support_z1 = sorted([zc+sign*(beam_top-snapClearance-zc),
+                                           zc+sign*(base_z-zc)])
+            support = box(comp,end_x-snapHookLength,end_x,nose_y,outer_y,
+                          support_z0,support_z1,label+'_Hook_print_base')
+            cover = join(comp,cover,support)
+        # Гнездо строится только по смещённому зубу, без его печатного основания.
         notch = prism_yz(comp,receiver,end_x-snapHookLength-snapClearance,
                          end_x+snapClearance,label+'_Edge_hook_recess')
         handle = cut(comp,handle,notch)
@@ -802,6 +821,9 @@ def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y):
                          'upper_cover_rail_z_mm':snapEdgeRail,
                          'beam_top_z_mm':beam_top,
                          'hook_rise_from_beam_mm':peak_z-beam_top,
+                         'hook_inset_y_mm':snapYInset,
+                         'hook_front_y_mm':hook_outer_y,
+                         'socket_front_skin_y_mm':max(0.0,outer_y-max(y for y,z in notch_profile)),
                          'print_face_y_mm':outer_y,
                          'latch_count':2,
                          'finger_recess_width_mm':pryWidth,
