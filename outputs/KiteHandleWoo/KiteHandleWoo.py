@@ -17,7 +17,7 @@ API хранит координаты в см: перевод выполняет
 """
 
 # ==================== SETTINGS / НАСТРОЙКИ ====================
-scriptVersion = '1.0.31'       # Версия повышается при каждом обновлении.
+scriptVersion = '1.0.32'       # Версия повышается при каждом обновлении.
 fitGap = 0.1  # Общий посадочный зазор НА СТОРОНУ, мм.
 boltSpacing = 180.0  # Межцентровое расстояние крепёжных болтов по X.
 handleTop = 72.0  # Полная высота от поверхности доски.
@@ -75,8 +75,6 @@ snapWidth = gripD/2-(wooHalfDepth-lidSeatDepth+lidAxialGap)  # Вычисляе�
 snapRootLength = 2.0  # Длина закреплённого участка у корня защёлки.
 snapHook = 0.75  # Глубина обоих зубьев за край посадки: верхний к +Z, нижний к -Z.
 snapHookLength = 2.5  # Длина зуба вдоль X у свободного конца.
-snapCatchInset = 1.0  # Смещение зацепов и гнёзд по Z к центру крышки; 0 возвращает прежнее положение.
-snapSupportMargin = 0.6  # Запас материала по X вокруг гнезда и перекрытие усиления с ручкой.
 snapRamp = 1.1  # Минимальная длина каждого скоса по Y; при необходимости увеличивается автоматически.
 snapTipLand = 0.4  # Плоский участок на вершине зуба.
 snapClearance = 0.2  # Зазор НА СТОРОНУ: с обеих сторон стойки каждого зуба по X и в ответном гнезде.
@@ -630,14 +628,6 @@ def validate(info, vertices):
               'уменьшите snapRamp, snapHook или snapClearance либо увеличьте толщину крышки.')
         check(0 < snapHookLength < snapLength and mechanismKeepout > snapClearance,
               'Invalid hook length or WOO keepout.')
-        check(0 <= snapCatchInset < snapEdgeRail and snapSupportMargin > 0,
-              'Смещение зацепа должно быть меньше snapEdgeRail; запас усиления должен быть положительным.')
-        if snapCatchInset > 0:
-            check(snapHookLength+snapClearance+snapSupportMargin+lidGap < snapLength,
-                  'Освобождение под усиление доходит до корня балки: уменьшите snapSupportMargin.')
-            check(lidWingLength+wooFitClearance+lidBorder-pryUnderlap >
-                  mechanismKeepout+snapRootLength+snapLength+snapClearance+snapSupportMargin+lidGap,
-                  'Усиление гнезда подходит к выемке под палец: уменьшите snapSupportMargin или pryUnderlap.')
         check(snapHookLength+snapClearance < snapLength,
               'Боковой зазор зуба должен быть положительным и не доходить до корня балки.')
         check(mechanismKeepout+snapRootLength+snapLength+snapClearance+minimumWall
@@ -655,7 +645,7 @@ def validate(info, vertices):
               'Выемка под палец заходит в гнёзда защёлок: уменьшите pryUnderlap.')
         # All of the latch must start on the same flat outer print face.
         flat_half = gripH/2-(sectionChamfer if printFriendlySection else gripR)
-        check(abs(wooZOffset)+wing_half-snapCatchInset+lidGap+snapHook+snapClearance < flat_half,
+        check(abs(wooZOffset)+wing_half+lidGap+snapHook+snapClearance < flat_half,
               'Edge catch reaches the curved outer skin; reduce lidWingH or hook size.')
         check(tongueRootLength > 0 and tongueThickness > 0 and
               tongueEngagement > 0 and tongueClearance > 0,'Invalid rigid tongue.')
@@ -701,7 +691,7 @@ def make_cover_outline(comp,vertices,radii,offset,y0,y1,wing_start,wing_end,zc,n
 
 # Справа создаются две зеркальные упругие защёлки в сквозных П-пазах.
 # Слева — жёсткий язычок с подкосом и карман для захода под наклоном.
-def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y,skin):
+def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y):
     """Integral in-plane beam in a through U-slot; left tongue has a gusset.
     Print with +Y facing the bed: the lid AND beam start at Y=gripD/2.
     There is no suspended beam beneath a closed cover surface.
@@ -741,11 +731,8 @@ def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y,skin):
               ((end_x,beam_top),top_start),(top_start,top_mid,top_end)]
     # Один профиль задаёт обе защёлки. Нижняя — точное отражение относительно Z=zc.
     # При подъёме крышки скосы зубьев направляют верхнюю балку к -Z, нижнюю к +Z.
-    # Упругие балки не сближаем: укорачиваем только стойки зубьев.
-    # Новая граница посадки ниже у верхней защёлки и выше у нижней.
-    catch_edge_z = edge_z-snapCatchInset
-    base_z = catch_edge_z-snapClearance
-    peak_z = catch_edge_z+lidGap+snapHook
+    base_z = edge_z-snapClearance
+    peak_z = edge_z+lidGap+snapHook
     nose_y = outer_y-2*snapRampEffective-snapTipLand
     hook_profile = [(nose_y,beam_top-snapClearance),(outer_y,beam_top-snapClearance),
                     (outer_y,base_z),(outer_y-snapRampEffective,peak_z),
@@ -770,26 +757,6 @@ def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y,skin):
         mouth = box(comp,end_x-snapHookLength-snapClearance,end_x+snapClearance,
                     -gripD,gripD,za,zb,label+'_Edge_release_access')
         cover = cut(comp,cover,mouth)
-        if snapCatchInset > 0:
-            # Возвращаем ASA в часть ранее вырезанной посадки. Усиление охватывает
-            # гнездо по X и соединяется с существующей стенкой и дном посадки.
-            support_x0 = end_x-snapHookLength-snapClearance-snapSupportMargin
-            support_x1 = end_x+snapClearance+snapSupportMargin
-            support_inner_z = catch_edge_z+lidGap
-            support_outer_z = edge_z+lidGap+snapSupportMargin
-            sz0,sz1 = sorted([zc+sign*(support_inner_z-zc),
-                             zc+sign*(support_outer_z-zc)])
-            support = box(comp,support_x0,support_x1,seat_y-snapSupportMargin,
-                          outer_y,sz0,sz1,label+'_Socket_support')
-            # Обрезка по исходной ручке сохраняет её наружный контур и скругления.
-            support = intersect(comp,support,comp.bRepBodies.add(skin))
-            handle = join(comp,handle,support)
-            # Крышка освобождается вокруг усиления с зазором lidGap. Это делается
-            # до добавления зуба: зуб затем входит в собственное ответное гнездо.
-            relief = box(comp,support_x0-lidGap,support_x1+lidGap,
-                         seat_y-snapSupportMargin-lidGap,outer_y+lidGap,
-                         sz0-lidGap,sz1+lidGap,label+'_Socket_support_cover_clearance')
-            cover = cut(comp,cover,relief)
         # Оба скоса сохранены: заход при закрытии и выход при подъёме пальцем.
         hook = prism_yz(comp,tooth,end_x-snapHookLength,end_x,label+'_Release_hook')
         cover = join(comp,cover,hook)
@@ -835,9 +802,6 @@ def releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y,skin):
                          'upper_cover_rail_z_mm':snapEdgeRail,
                          'beam_top_z_mm':beam_top,
                          'hook_rise_from_beam_mm':peak_z-beam_top,
-                         'catch_inset_mm':snapCatchInset,
-                         'socket_support_margin_mm':snapSupportMargin,
-                         'socket_support_enabled':snapCatchInset > 0,
                          'print_face_y_mm':outer_y,
                          'latch_count':2,
                          'finger_recess_width_mm':pryWidth,
@@ -1054,7 +1018,7 @@ def run(context):
         stage = 'Rigid tongue and accessible release catch'
         # 7. Добавить крепления крышки и соответствующие карманы в ручке.
         if enableSnapFits:
-            handle,cover,lock_info = releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y,skin)
+            handle,cover,lock_info = releasable_lock(comp,handle,cover,xmax,wing_end,zc,seat_y)
             report['cover_lock'] = lock_info
         stage = 'Smooth finger scoop and rounded pull lip'
         handle,cover,scoop_info = finger_scoop(comp,handle,cover,wing_end,zc)
