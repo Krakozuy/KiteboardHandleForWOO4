@@ -3,7 +3,7 @@
   "type": "script",
   "author": "",
   "description": {"": "Kiteboard handle with a flush removable WOO cover. All dimensions at the top of the Python file."},
-  "version": "1.0.30",
+  "version": "1.0.31",
   "runOnStartup": false,
   "supportedOS": "windows|mac"
 }
