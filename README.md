@@ -1,5 +1,14 @@
 # KiteboardHandleForWOO4 — Kiteboard Handle for WOO 4
 
+> [!TIP]
+> **Just want to print? Download the ready-to-print STL files — no Fusion 360 or script required.**
+>
+> **[Handle.stl](Handle.stl) · [Cover.stl](Cover.stl)**
+>
+> Optional TPU pads: [Left](TPU_Pad_Left.stl) · [Right](TPU_Pad_Right.stl).
+>
+> Open a file and click **Download raw file**, or download the whole repository via **Code → Download ZIP**. Open the STL files in your slicer. The script is only needed if you want to customize the model.
+
 A kiteboard handle with an integrated WOO 4 sensor cavity, a removable flush cover, and optional TPU foot pads. A Python script generates the model in Fusion 360 and exports the parts for 3D printing.
 
 ## Photos and model views
@@ -143,6 +152,15 @@ I printed the handle on a **Creality K2** using **ASA** filament with the follow
 <!-- Русская версия -->
 
 # KiteboardHandleForWOO4 — ручка для кайтборда с креплением WOO 4
+
+> [!TIP]
+> **Хотите просто напечатать ручку? Скачайте готовые STL-файлы — Fusion 360 и запуск скрипта не нужны.**
+>
+> **[Ручка — Handle.stl](Handle.stl) · [Крышка — Cover.stl](Cover.stl)**
+>
+> Необязательные TPU-проставки: [левая](TPU_Pad_Left.stl) · [правая](TPU_Pad_Right.stl).
+>
+> Откройте файл и нажмите **Download raw file** либо скачайте весь репозиторий через **Code → Download ZIP**. Откройте STL-файлы в слайсере. Скрипт нужен только для изменения модели под себя.
 
 Настраиваемая ручка для кайтборда со встроенной полостью для датчика WOO 4, съёмной крышкой и опциональными TPU-проставками под ножки. Python-скрипт строит модель в Fusion 360 и экспортирует детали для 3D-печати.
 
