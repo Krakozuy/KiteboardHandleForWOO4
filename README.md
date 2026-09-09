@@ -150,6 +150,10 @@ I printed the handle on a **Creality K2** using **ASA** filament with the follow
 | Infill pattern | Gyroid |
 | Supports | Disabled — print without supports |
 
+## License
+
+This project is licensed under [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/). You may use, share, and adapt it, including commercially, provided you give appropriate credit, link to the license, and indicate any changes. See [LICENSE](LICENSE) for the full terms.
+
 ---
 
 <!-- Русская версия -->
@@ -306,3 +310,6 @@ TPU-проставки задуманы для компенсации жёстк
 | Тип заполнения | Gyroid |
 | Поддержки | Отключены — печать без поддержек |
 
+## Лицензия
+
+Проект распространяется по лицензии [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/deed.ru). Разрешено использовать, распространять и изменять материалы, в том числе в коммерческих целях, при указании авторства, ссылки на лицензию и внесённых изменений. Полные условия — в файле [LICENSE](LICENSE).
