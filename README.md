@@ -62,7 +62,7 @@ You can use the supplied STL files as a starting point, or run the script to gen
 You need Autodesk Fusion on Windows or macOS. The script uses Fusion's built-in Python environment; no separate Python installation or pip packages are required.
 
 1. Download this repository using **Code → Download ZIP** and extract it, or clone it with Git.
-2. Copy `KiteboardHandleForWOO4.py` and `KiteboardHandleForWOO4.manifest` from the repository root into a separate folder named `KiteboardHandleForWOO4` for installation in Fusion:
+2. After extracting the ZIP, rename the folder: `Kiteboard-Handle-for-WOO4-main` → `KiteboardHandleForWOO4`. The folder, Python script, and manifest will then have matching names, as required by Fusion. Keep the files together:
 
    ```text
    KiteboardHandleForWOO4/
@@ -206,7 +206,7 @@ KiteboardHandleForWOO4/
 Понадобится Autodesk Fusion на Windows или macOS. Скрипт использует встроенную среду Python в Fusion; отдельно устанавливать Python или пакеты через pip не нужно.
 
 1. Скачайте репозиторий через **Code → Download ZIP** и распакуйте его либо клонируйте с помощью Git.
-2. Скопируйте `KiteboardHandleForWOO4.py` и `KiteboardHandleForWOO4.manifest` из корня репозитория в отдельную папку `KiteboardHandleForWOO4` для установки во Fusion:
+2. После распаковки ZIP переименуйте папку: `Kiteboard-Handle-for-WOO4-main` → `KiteboardHandleForWOO4`. Тогда папка, скрипт и манифест будут называться одинаково, как требует Fusion. Оставьте файлы вместе:
 
    ```text
    KiteboardHandleForWOO4/
