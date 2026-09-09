@@ -40,7 +40,7 @@ The default configuration uses **180 mm bolt spacing**, **M6 mounting holes**, a
 
 ## Files
 
-The script, manifest, STL files, and Fusion archive are in the repository root. Photos are in `images/`.
+The script, manifest, STL files, and Fusion archive are in the repository root.
 
 ```text
 KiteboardHandleForWOO4/
@@ -52,7 +52,6 @@ KiteboardHandleForWOO4/
 ├── TPU_Pad_Left.stl
 ├── TPU_Pad_Right.stl
 ├── KiteHandle_WOO.f3d
-├── build_report.json
 └── images/
 ```
 
@@ -64,7 +63,6 @@ KiteboardHandleForWOO4/
 | `Cover.stl` | Printable cover |
 | `TPU_Pad_Left.stl`, `TPU_Pad_Right.stl` | Printable foot pads |
 | `KiteHandle_WOO.f3d` | Complete Fusion model archive |
-| `build_report.json` | Build status, settings, dimensions, and geometry checks |
 
 You can use the supplied STL files as a starting point, or run the script to generate your own configuration.
 
