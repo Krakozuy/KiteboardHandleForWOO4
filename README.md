@@ -1,4 +1,4 @@
-# KiteHandleWoo — Kiteboard Handle for WOO 4
+# KiteboardHandleForWOO4 — Kiteboard Handle for WOO 4
 
 A kiteboard handle with an integrated WOO 4 sensor cavity, a removable flush cover, and optional TPU foot pads. A Python script generates the model in Fusion 360 and exports the parts for 3D printing.
 
@@ -32,10 +32,10 @@ The default configuration uses **180 mm bolt spacing**, **M6 mounting holes**, a
 The script, manifest, STL files, and Fusion archive are in the repository root. Photos are in `images/`.
 
 ```text
-Kiteboard Handle for WOO4/
+KiteboardHandleForWOO4/
 ├── README.md
-├── KiteHandleWoo.py
-├── KiteHandleWoo.manifest
+├── KiteboardHandleForWOO4.py
+├── KiteboardHandleForWOO4.manifest
 ├── Handle.stl
 ├── Cover.stl
 ├── TPU_Pad_Left.stl
@@ -47,8 +47,8 @@ Kiteboard Handle for WOO4/
 
 | File | Purpose |
 | --- | --- |
-| `KiteHandleWoo.py` | Model generator and editable settings |
-| `KiteHandleWoo.manifest` | Script metadata used by Fusion |
+| `KiteboardHandleForWOO4.py` | Model generator and editable settings |
+| `KiteboardHandleForWOO4.manifest` | Script metadata used by Fusion |
 | `Handle.stl` | Printable handle |
 | `Cover.stl` | Printable cover |
 | `TPU_Pad_Left.stl`, `TPU_Pad_Right.stl` | Printable foot pads |
@@ -62,18 +62,18 @@ You can use the supplied STL files as a starting point, or run the script to gen
 You need Autodesk Fusion on Windows or macOS. The script uses Fusion's built-in Python environment; no separate Python installation or pip packages are required.
 
 1. Download this repository using **Code → Download ZIP** and extract it, or clone it with Git.
-2. Copy `KiteHandleWoo.py` and `KiteHandleWoo.manifest` from the repository root into a separate folder named `KiteHandleWoo` for installation in Fusion:
+2. Copy `KiteboardHandleForWOO4.py` and `KiteboardHandleForWOO4.manifest` from the repository root into a separate folder named `KiteboardHandleForWOO4` for installation in Fusion:
 
    ```text
-   KiteHandleWoo/
-   ├── KiteHandleWoo.py
-   └── KiteHandleWoo.manifest
+   KiteboardHandleForWOO4/
+   ├── KiteboardHandleForWOO4.py
+   └── KiteboardHandleForWOO4.manifest
    ```
 
-3. Put this installation folder somewhere writable. Generated files are saved beside the installed script. When changing settings, edit this copy of `KiteHandleWoo.py`.
+3. Put this installation folder somewhere writable. Generated files are saved beside the installed script. When changing settings, edit this copy of `KiteboardHandleForWOO4.py`.
 4. Open Fusion and go to **Utilities → Add-Ins → Scripts and Add-Ins**.
-5. On the **Scripts** tab, click **+** to add a local script and select the `KiteHandleWoo` folder.
-6. Select **KiteHandleWoo** in the script list and click **Run**.
+5. On the **Scripts** tab, click **+** to add a local script and select the `KiteboardHandleForWOO4` folder.
+6. Select **KiteboardHandleForWOO4** in the script list and click **Run**.
 
 See Autodesk's [Scripts and Add-Ins instructions](https://help.autodesk.com/cloudhelp/ENU/Fusion-Model/files/SLD-MANAGE-SCRIPTS-ADD-INS.htm) for the official workflow.
 
@@ -89,7 +89,7 @@ With `exportFiles = True`, it saves the F3D archive and separate STL files besid
 
 > **Adjust `fitGap` and `snapClearance` for your printer. I used `fitGap = 0.1` and `snapClearance = 0.2` on a Creality K2.**
 
-Open `KiteHandleWoo.py` in a text editor and edit the **SETTINGS / НАСТРОЙКИ** section near the top. Save the file, then run it again in Fusion.
+Open `KiteboardHandleForWOO4.py` in a text editor and edit the **SETTINGS / НАСТРОЙКИ** section near the top. Save the file, then run it again in Fusion.
 
 All setting lengths are in **millimeters**; `lidTiltAngle` is in **degrees**. Dimensions are controlled by the Python settings: each run rebuilds the model in a new document.
 
@@ -113,11 +113,11 @@ Not every combination of dimensions is geometrically possible. If a build fails,
 
 ## Customize with ChatGPT
 
-For simple changes, edit the settings directly. For a different handle shape or a new feature, attach **`KiteHandleWoo.py`** to ChatGPT and describe what you want to change. I prefer **ChatGPT Astra**. In my experience, it works best with 3D.
+For simple changes, edit the settings directly. For a different handle shape or a new feature, attach **`KiteboardHandleForWOO4.py`** to ChatGPT and describe what you want to change. I prefer **ChatGPT Astra**. In my experience, it works best with 3D.
 
 Include your target dimensions, a sketch or reference image if useful.
 
-Save the returned script as `KiteHandleWoo.py`, keep the manifest beside it, and run it in Fusion. Review the generated geometry and try the fit before using the modified parts.
+Save the returned script as `KiteboardHandleForWOO4.py`, keep the manifest beside it, and run it in Fusion. Review the generated geometry and try the fit before using the modified parts.
 
 ## TPU foot pads
 
@@ -142,7 +142,7 @@ I printed the handle on a **Creality K2** using **ASA** filament with the follow
 
 <!-- Русская версия -->
 
-# KiteHandleWoo — ручка для кайтборда с креплением WOO 4
+# KiteboardHandleForWOO4 — ручка для кайтборда с креплением WOO 4
 
 Настраиваемая ручка для кайтборда со встроенной полостью для датчика WOO 4, съёмной крышкой заподлицо и опциональными TPU-проставками под ножки. Python-скрипт строит модель в Autodesk Fusion (Fusion 360) и экспортирует детали для 3D-печати.
 
@@ -178,10 +178,10 @@ I printed the handle on a **Creality K2** using **ASA** filament with the follow
 Скрипт, манифест, STL-файлы и архив Fusion находятся в корне репозитория. Фотографии — в папке `images/`.
 
 ```text
-Kiteboard Handle for WOO4/
+KiteboardHandleForWOO4/
 ├── README.md
-├── KiteHandleWoo.py
-├── KiteHandleWoo.manifest
+├── KiteboardHandleForWOO4.py
+├── KiteboardHandleForWOO4.manifest
 ├── Handle.stl
 ├── Cover.stl
 ├── TPU_Pad_Left.stl
@@ -193,8 +193,8 @@ Kiteboard Handle for WOO4/
 
 | Файл | Назначение |
 | --- | --- |
-| `KiteHandleWoo.py` | Генератор модели и редактируемые настройки |
-| `KiteHandleWoo.manifest` | Метаданные скрипта для Fusion |
+| `KiteboardHandleForWOO4.py` | Генератор модели и редактируемые настройки |
+| `KiteboardHandleForWOO4.manifest` | Метаданные скрипта для Fusion |
 | `Handle.stl` | Ручка для печати |
 | `Cover.stl` | Крышка для печати |
 | `TPU_Pad_Left.stl`, `TPU_Pad_Right.stl` | Проставки под ножки для печати |
@@ -208,18 +208,18 @@ Kiteboard Handle for WOO4/
 Понадобится Autodesk Fusion на Windows или macOS. Скрипт использует встроенную среду Python в Fusion; отдельно устанавливать Python или пакеты через pip не нужно.
 
 1. Скачайте репозиторий через **Code → Download ZIP** и распакуйте его либо клонируйте с помощью Git.
-2. Скопируйте `KiteHandleWoo.py` и `KiteHandleWoo.manifest` из корня репозитория в отдельную папку `KiteHandleWoo` для установки во Fusion:
+2. Скопируйте `KiteboardHandleForWOO4.py` и `KiteboardHandleForWOO4.manifest` из корня репозитория в отдельную папку `KiteboardHandleForWOO4` для установки во Fusion:
 
    ```text
-   KiteHandleWoo/
-   ├── KiteHandleWoo.py
-   └── KiteHandleWoo.manifest
+   KiteboardHandleForWOO4/
+   ├── KiteboardHandleForWOO4.py
+   └── KiteboardHandleForWOO4.manifest
    ```
 
-3. Разместите папку установки там, где разрешена запись. Созданные файлы сохраняются рядом с установленным скриптом. При изменении настроек редактируйте эту копию `KiteHandleWoo.py`.
+3. Разместите папку установки там, где разрешена запись. Созданные файлы сохраняются рядом с установленным скриптом. При изменении настроек редактируйте эту копию `KiteboardHandleForWOO4.py`.
 4. Откройте Fusion и перейдите в **Utilities → Add-Ins → Scripts and Add-Ins**.
-5. На вкладке **Scripts** нажмите **+**, чтобы добавить локальный скрипт, и выберите папку `KiteHandleWoo`.
-6. Выберите **KiteHandleWoo** в списке скриптов и нажмите **Run**.
+5. На вкладке **Scripts** нажмите **+**, чтобы добавить локальный скрипт, и выберите папку `KiteboardHandleForWOO4`.
+6. Выберите **KiteboardHandleForWOO4** в списке скриптов и нажмите **Run**.
 
 Официальный порядок действий описан в [инструкции Autodesk по Scripts and Add-Ins](https://help.autodesk.com/cloudhelp/ENU/Fusion-Model/files/SLD-MANAGE-SCRIPTS-ADD-INS.htm).
 
@@ -235,7 +235,7 @@ Kiteboard Handle for WOO4/
 
 > **Отрегулируйте `fitGap` и `snapClearance` под свой принтер. Я использовал `fitGap = 0.1` и `snapClearance = 0.2` на Creality K2.**
 
-Откройте `KiteHandleWoo.py` в текстовом редакторе и измените раздел **SETTINGS / НАСТРОЙКИ** в начале файла. Сохраните файл и снова запустите скрипт во Fusion.
+Откройте `KiteboardHandleForWOO4.py` в текстовом редакторе и измените раздел **SETTINGS / НАСТРОЙКИ** в начале файла. Сохраните файл и снова запустите скрипт во Fusion.
 
 Все длины в настройках указаны в **миллиметрах**, а `lidTiltAngle` — в **градусах**. Размеры задаются настройками Python: при каждом запуске модель строится заново в новом документе.
 
@@ -259,11 +259,11 @@ Kiteboard Handle for WOO4/
 
 ## Кастомизация с ChatGPT
 
-Для простых изменений достаточно отредактировать настройки. Чтобы изменить форму ручки, прикрепите **`KiteHandleWoo.py`** к сообщению в ChatGPT и опишите желаемые изменения. Я предпочитаю **ChatGPT Astra**. По моему опыту, он лучше всех работает с 3D.
+Для простых изменений достаточно отредактировать настройки. Чтобы изменить форму ручки, прикрепите **`KiteboardHandleForWOO4.py`** к сообщению в ChatGPT и опишите желаемые изменения. Я предпочитаю **ChatGPT Astra**. По моему опыту, он лучше всех работает с 3D.
 
 Укажите нужные размеры, при необходимости добавьте эскиз или пример изображения.
 
-Сохраните полученный скрипт как `KiteHandleWoo.py`, оставьте манифест рядом и запустите его во Fusion. Осмотрите построенную геометрию и проверьте посадку перед использованием изменённых деталей.
+Сохраните полученный скрипт как `KiteboardHandleForWOO4.py`, оставьте манифест рядом и запустите его во Fusion. Осмотрите построенную геометрию и проверьте посадку перед использованием изменённых деталей.
 
 ## TPU-проставки
 
