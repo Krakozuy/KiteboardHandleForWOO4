@@ -29,6 +29,22 @@ The default configuration uses **180 mm bolt spacing**, **M6 mounting holes**, a
 
 ## Files
 
+The script, manifest, STL files, and Fusion archive are in the repository root. Photos are in `images/`.
+
+```text
+Kiteboard Handle for WOO4/
+├── README.md
+├── KiteHandleWoo.py
+├── KiteHandleWoo.manifest
+├── Handle.stl
+├── Cover.stl
+├── TPU_Pad_Left.stl
+├── TPU_Pad_Right.stl
+├── KiteHandle_WOO.f3d
+├── build_report.json
+└── images/
+```
+
 | File | Purpose |
 | --- | --- |
 | `KiteHandleWoo.py` | Model generator and editable settings |
@@ -46,7 +62,7 @@ You can use the supplied STL files as a starting point, or run the script to gen
 You need Autodesk Fusion on Windows or macOS. The script uses Fusion's built-in Python environment; no separate Python installation or pip packages are required.
 
 1. Download this repository using **Code → Download ZIP** and extract it, or clone it with Git.
-2. Keep the script and manifest together in a folder named `KiteHandleWoo`:
+2. Copy `KiteHandleWoo.py` and `KiteHandleWoo.manifest` from the repository root into a separate folder named `KiteHandleWoo` for installation in Fusion:
 
    ```text
    KiteHandleWoo/
@@ -54,7 +70,7 @@ You need Autodesk Fusion on Windows or macOS. The script uses Fusion's built-in 
    └── KiteHandleWoo.manifest
    ```
 
-3. Put the folder somewhere writable, since generated files are saved beside the script.
+3. Put this installation folder somewhere writable. Generated files are saved beside the installed script. When changing settings, edit this copy of `KiteHandleWoo.py`.
 4. Open Fusion and go to **Utilities → Add-Ins → Scripts and Add-Ins**.
 5. On the **Scripts** tab, click **+** to add a local script and select the `KiteHandleWoo` folder.
 6. Select **KiteHandleWoo** in the script list and click **Run**.
@@ -159,6 +175,22 @@ I printed the handle on a **Creality K2** using **ASA** filament with the follow
 
 ## Файлы
 
+Скрипт, манифест, STL-файлы и архив Fusion находятся в корне репозитория. Фотографии — в папке `images/`.
+
+```text
+Kiteboard Handle for WOO4/
+├── README.md
+├── KiteHandleWoo.py
+├── KiteHandleWoo.manifest
+├── Handle.stl
+├── Cover.stl
+├── TPU_Pad_Left.stl
+├── TPU_Pad_Right.stl
+├── KiteHandle_WOO.f3d
+├── build_report.json
+└── images/
+```
+
 | Файл | Назначение |
 | --- | --- |
 | `KiteHandleWoo.py` | Генератор модели и редактируемые настройки |
@@ -176,7 +208,7 @@ I printed the handle on a **Creality K2** using **ASA** filament with the follow
 Понадобится Autodesk Fusion на Windows или macOS. Скрипт использует встроенную среду Python в Fusion; отдельно устанавливать Python или пакеты через pip не нужно.
 
 1. Скачайте репозиторий через **Code → Download ZIP** и распакуйте его либо клонируйте с помощью Git.
-2. Скрипт и манифест должны находиться вместе в папке `KiteHandleWoo`:
+2. Скопируйте `KiteHandleWoo.py` и `KiteHandleWoo.manifest` из корня репозитория в отдельную папку `KiteHandleWoo` для установки во Fusion:
 
    ```text
    KiteHandleWoo/
@@ -184,7 +216,7 @@ I printed the handle on a **Creality K2** using **ASA** filament with the follow
    └── KiteHandleWoo.manifest
    ```
 
-3. Разместите папку там, где разрешена запись: созданные файлы сохраняются рядом со скриптом.
+3. Разместите папку установки там, где разрешена запись. Созданные файлы сохраняются рядом с установленным скриптом. При изменении настроек редактируйте эту копию `KiteHandleWoo.py`.
 4. Откройте Fusion и перейдите в **Utilities → Add-Ins → Scripts and Add-Ins**.
 5. На вкладке **Scripts** нажмите **+**, чтобы добавить локальный скрипт, и выберите папку `KiteHandleWoo`.
 6. Выберите **KiteHandleWoo** в списке скриптов и нажмите **Run**.
