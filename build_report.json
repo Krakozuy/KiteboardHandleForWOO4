@@ -1,0 +1,239 @@
+{
+  "woo_profile": {
+    "height_mm": 18.000010365802233,
+    "drawing_height_mm": 16.000010365802233,
+    "profile_offset_mm": 1,
+    "alpha_deg": 51.062078810532164,
+    "beta_deg": 108.52648278447025,
+    "side_chord_mm": 0.9614328092839803
+  },
+  "settings": {
+    "scriptVersion": "1.0.35",
+    "fitGap": 0.1,
+    "boltSpacing": 180.0,
+    "handleTop": 72.0,
+    "gripH": 28.0,
+    "gripD": 28.0,
+    "legLean": 20.0,
+    "boltD": 6.6,
+    "headPocketD": 13.0,
+    "shoulder": 4.0,
+    "enableFootPads": true,
+    "padThickness": 3.0,
+    "padKeyHeight": 2.0,
+    "padKeyLength": 15.0,
+    "padKeyWidth": 2.5,
+    "padKeyEdgeInset": 3.5,
+    "padKeyClearance": 0.2,
+    "gripR": 6.0,
+    "printFriendlySection": true,
+    "sectionChamfer": 3.0,
+    "bendR": 17.0,
+    "baseTrimMargin": 1.0,
+    "wooTopFlat": 32.044,
+    "wooBottomFlat": 51.279,
+    "wooSlopeRise": 12.203,
+    "wooTopChord": 0.862,
+    "wooShortSide": 2.255,
+    "wooTopR": 1.0,
+    "wooSideR": 1.0,
+    "wooBottomR": 0.5,
+    "wooSideChordReference": 0.96,
+    "wooHalfDepth": 11.0,
+    "wooProfileOffset": 1,
+    "wooZOffset": 0.0,
+    "wooFitClearance": 0.0,
+    "enableWooFingerRecesses": true,
+    "wooFingerD": 10.0,
+    "wooFingerDepth": 4.0,
+    "wooFingerBowlRatio": 0.75,
+    "wooFingerSeatMargin": 0.2,
+    "enableDrainHole": true,
+    "drainHoleD": 1.5,
+    "lidBorder": 1.15,
+    "lidGap": 0.1,
+    "lidSeatDepth": 1.1,
+    "lidAxialGap": 0.1,
+    "lidWingLength": 16.0,
+    "lidWingH": 11.0,
+    "lidWingR": 1.0,
+    "enableSnapFits": true,
+    "snapLength": 12.0,
+    "snapThickness": 1.4,
+    "snapRootThickness": 2.0,
+    "snapWidth": 4.0,
+    "snapRootLength": 2.0,
+    "snapHook": 0.75,
+    "snapHookLength": 2.5,
+    "snapYInset": 1.0,
+    "snapRamp": 1.1,
+    "snapTipLand": 0.4,
+    "snapClearance": 0.2,
+    "snapRampEffective": 1.1,
+    "snapFlexSpace": 0.85,
+    "snapUpperGap": 0.85,
+    "snapEdgeRail": 2.0,
+    "mechanismKeepout": 0.8,
+    "tongueEngagement": 1.2,
+    "tongueThickness": 1.6,
+    "tongueTipThickness": 0.8,
+    "tongueWidth": 5.0,
+    "tongueRootLength": 3.0,
+    "tongueClearance": 0.1,
+    "tongueMotionSteps": 12,
+    "lidTiltAngle": 2.0,
+    "lidTiltClearance": 0.1,
+    "pryWidth": 14.0,
+    "pryLength": 13.0,
+    "pryUnderlap": 0.8,
+    "pryDepth": 4.0,
+    "pryBowlCenterRatio": 0.25,
+    "pryNeckInset": 0.15,
+    "pryLipWidth": 6.0,
+    "pryLipProjection": 1.8,
+    "pryLipThickness": 2.4,
+    "pryLipRoot": 1.5,
+    "pryLipR": 0.8,
+    "pryLipMinClearance": 0.6,
+    "minimumWall": 1.5,
+    "makeFitSample": false,
+    "sampleWidth": 18.0,
+    "sampleHeight": 18.0,
+    "exportFiles": true,
+    "showMessage": true,
+    "modelName": "KiteHandle_WOO",
+    "geometryTolerance": 0.02
+  },
+  "drain_hole": {
+    "enabled": true,
+    "diameter_mm": 1.5,
+    "center_xy_mm": [
+      0,
+      0
+    ],
+    "direction": "-Z"
+  },
+  "woo_finger_recesses": {
+    "enabled": true,
+    "diameter_mm": 10.0,
+    "depth_from_seat_mm": 4.0,
+    "shape": "ellipsoidal bowl",
+    "bowl_ratio": 0.75,
+    "bottom_y_mm": 5.9,
+    "centers_xz_mm": [
+      [
+        -24.249210275985213,
+        58.0
+      ],
+      [
+        24.249210275985213,
+        58.0
+      ]
+    ]
+  },
+  "cover_lock": {
+    "sample_center_x": 35.92665841502068,
+    "sample_min_y": 8.000000000000002,
+    "free_beam_length_mm": 12.0,
+    "beam_depth_mm": 4.0,
+    "upper_slot_gap_z_mm": 0.85,
+    "lower_slot_gap_z_mm": 0.85,
+    "upper_cover_rail_z_mm": 2.0,
+    "beam_top_z_mm": 61.800000000000004,
+    "hook_rise_from_beam_mm": 3.6999999999999957,
+    "hook_inset_y_mm": 1.0,
+    "hook_front_y_mm": 13.0,
+    "socket_front_skin_y_mm": 0.8000000000000007,
+    "print_face_y_mm": 14.0,
+    "latch_count": 2,
+    "finger_recess_width_mm": 14.0,
+    "slot_type": "Two mirrored through U-slots and edge hooks",
+    "release_direction": "Lift latch edge +Y; upper beam flexes -Z, lower +Z; then slide +X",
+    "planned_opening_angle_deg": 2.0
+  },
+  "finger_access": {
+    "type": "curved ellipsoidal scoop with rounded pull lip",
+    "length_mm": 13.0,
+    "width_mm": 14.0,
+    "depth_mm": 4.0,
+    "floor_limit_y_mm": 10.0,
+    "neck_width_mm": 12.046640106136302,
+    "bowl_center_shift_mm": 4.387841734139457,
+    "lip_min_clearance_mm": 0.6,
+    "lip_projection_mm": 1.8,
+    "lip_thickness_mm": 2.4
+  },
+  "handle": {
+    "solid": true,
+    "lumps": 1,
+    "volume_mm3": 158124.04134553976,
+    "bounds_mm": [
+      [
+        -105.18622232277664,
+        -14.0,
+        0.0
+      ],
+      [
+        105.18622232277664,
+        14.0,
+        72.0
+      ]
+    ]
+  },
+  "cover": {
+    "solid": true,
+    "lumps": 1,
+    "volume_mm3": 5158.054685166285,
+    "bounds_mm": [
+      [
+        -46.47665841502069,
+        8.200000000000001,
+        47.84999481709888
+      ],
+      [
+        47.076658415020695,
+        14.0,
+        68.15000518290111
+      ]
+    ]
+  },
+  "foot_pads": [
+    {
+      "solid": true,
+      "lumps": 1,
+      "volume_mm3": 2529.9923297997143,
+      "bounds_mm": [
+        [
+          -105.18622232277664,
+          -14.0,
+          -3.0000000000000004
+        ],
+        [
+          -74.81377767722333,
+          14.0,
+          1.9999999999999996
+        ]
+      ]
+    },
+    {
+      "solid": true,
+      "lumps": 1,
+      "volume_mm3": 2529.9923297997143,
+      "bounds_mm": [
+        [
+          74.81377767722333,
+          -14.000000000000002,
+          -3.0000000000000004
+        ],
+        [
+          105.18622232277664,
+          14.000000000000002,
+          1.9999999999999996
+        ]
+      ]
+    }
+  ],
+  "assembly_height_mm": 75.0,
+  "overlap_mm3": 0.0,
+  "status": "PASS"
+}
