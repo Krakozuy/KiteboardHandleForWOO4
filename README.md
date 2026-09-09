@@ -5,6 +5,8 @@
 >
 > **[Handle.stl](Handle.stl) · [Cover.stl](Cover.stl)**
 >
+> **[Jump to printing settings](#printing)**
+>
 > Optional TPU pads: [Left](TPU_Pad_Left.stl) · [Right](TPU_Pad_Right.stl).
 >
 > Open a file and click **Download raw file**, or download the whole repository via **Code → Download ZIP**. Open the STL files in your slicer. The script is only needed if you want to customize the model.
@@ -146,6 +148,7 @@ I printed the handle on a **Creality K2** using **ASA** filament with the follow
 | Alternate extra wall | Enabled (`true`) |
 | Infill density | 25% |
 | Infill pattern | Gyroid |
+| Supports | Disabled — print without supports |
 
 ---
 
@@ -157,6 +160,8 @@ I printed the handle on a **Creality K2** using **ASA** filament with the follow
 > **Хотите просто напечатать ручку? Скачайте готовые STL-файлы — Fusion 360 и запуск скрипта не нужны.**
 >
 > **[Ручка — Handle.stl](Handle.stl) · [Крышка — Cover.stl](Cover.stl)**
+>
+> **[Перейти к настройкам печати](#печать)**
 >
 > Необязательные TPU-проставки: [левая](TPU_Pad_Left.stl) · [правая](TPU_Pad_Right.stl).
 >
@@ -299,4 +304,5 @@ TPU-проставки задуманы для компенсации жёстк
 | Alternate extra wall | Включено (`true`) |
 | Плотность заполнения | 25% |
 | Тип заполнения | Gyroid |
+| Поддержки | Отключены — печать без поддержек |
 
