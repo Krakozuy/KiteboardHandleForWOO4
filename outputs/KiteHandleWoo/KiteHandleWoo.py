@@ -17,7 +17,7 @@ API хранит координаты в см: перевод выполняет
 """
 
 # ==================== SETTINGS / НАСТРОЙКИ ====================
-scriptVersion = '1.0.33'       # Версия повышается при каждом обновлении.
+scriptVersion = '1.0.34'       # Версия повышается при каждом обновлении.
 fitGap = 0.1  # Общий посадочный зазор НА СТОРОНУ, мм.
 boltSpacing = 180.0  # Межцентровое расстояние крепёжных болтов по X.
 handleTop = 72.0  # Полная высота от поверхности доски.
@@ -54,9 +54,13 @@ wooSideR = 1.0  # Радиус боковых углов исходного пр
 wooBottomR = 0.5  # Радиус нижних углов исходного профиля.
 wooSideChordReference = 0.960  # Справочная хорда из чертежа для сопоставления с отчётом.
 wooHalfDepth = 11.0  # Половина полезной глубины: полость от Y=-11 до Y=+11.
-wooProfileOffset = 1.0  # Расширение исходного контура наружу в плоскости XZ.
+wooProfileOffset = 3  # Расширение исходного контура наружу в плоскости XZ.
 wooZOffset = 0.0  # Сдвиг полости по Z относительно центра перекладины.
 wooFitClearance = 0.0  # Дополнительный припуск к профилю ПОСЛЕ wooProfileOffset.
+enableWooFingerRecesses = True  # Две полукруглые выемки для извлечения датчика; False отключает.
+wooFingerD = 10.0  # Диаметр выемок в плоскости XZ, мм.
+wooFingerDepth = 8.0  # Глубина по -Y от плоскости посадки крышки, а не от наружной поверхности.
+wooFingerSeatMargin = 0.2  # Минимальный отступ выемок от верхнего/нижнего края бокового крыла крышки.
 enableDrainHole = True  # Слив из камеры WOO вниз через хват; False отключает отверстие.
 drainHoleD = 1.5  # Диаметр сливного отверстия, мм; центр X=0, Y=0, направление вдоль Z.
 
@@ -524,6 +528,51 @@ def handle_blank(comp):
     return body
 
 
+# Найти центры выемок на прямых наклонных боках камеры, с учётом её оффсета.
+def woo_finger_recess_geometry(cavity_curves):
+    radius = wooFingerD/2
+    check(radius > 0 and wooFingerSeatMargin > 0,'Диаметр выемок и отступ от края должны быть положительными.')
+    check(0 < wooFingerDepth < 2*wooHalfDepth-lidSeatDepth-minimumWall,
+          'Выемки слишком глубокие: оставьте опору датчика у задней части камеры.')
+    # У правого бока выбираем самый длинный наклонный прямой участок.
+    # Верхняя/нижняя горизонтали и короткий нижний скос сюда не попадают.
+    sides = [c for c in cavity_curves if len(c) == 2 and min(c[0][0],c[1][0]) > 0
+             and abs(c[1][0]-c[0][0]) > geometryTolerance
+             and abs(c[1][1]-c[0][1]) > geometryTolerance]
+    check(bool(sides),'Не найден наклонный бок камеры для выемки под палец.')
+    side = max(sides,key=lambda c: math.dist(c[0],c[1]))
+    low,high = sorted(side,key=lambda q: q[1])
+    length = math.dist(low,high)
+    check(2*(radius+geometryTolerance) < length,'Выемка шире прямого участка камеры: уменьшите wooFingerD.')
+    zc = handleTop-gripH/2+wooZOffset
+    wing_half = lidWingH/2+wooFitClearance+lidBorder
+    # Весь круг должен оставаться под боковым крылом крышки; диаметр не должен
+    # доходить до скруглений исходного бока. Выбираем ближайшую к центру высоту.
+    end_margin = (radius+geometryTolerance)*(high[1]-low[1])/length
+    z_low = max(low[1]+end_margin,zc-wing_half+radius+wooFingerSeatMargin)
+    z_high = min(high[1]-end_margin,zc+wing_half-radius-wooFingerSeatMargin)
+    check(z_low <= z_high,'Выемка не помещается под крышкой: уменьшите wooFingerD или увеличьте lidWingH.')
+    center_z = max(z_low,min(zc,z_high))
+    center_x = low[0]+(high[0]-low[0])*(center_z-low[1])/(high[1]-low[1])
+    y_bottom = wooHalfDepth-lidSeatDepth-wooFingerDepth
+    return center_x,center_z,radius,y_bottom
+
+
+# Вырезать круги вдоль Y: внутри камеры половина каждого круга уже пустая,
+# поэтому в боковой стенке остаётся ровно полукруг для захвата датчика.
+def make_woo_finger_recesses(comp,handle,cavity_curves):
+    cx,cz,radius,y_bottom = woo_finger_recess_geometry(cavity_curves)
+    for sign,label in [(-1,'Left'),(1,'Right')]:
+        sk = sketch_plane(comp,(0,y_bottom,0),(0,1,0),'WOO_finger_'+label)
+        sk.sketchCurves.sketchCircles.addByCenterRadius(
+            sk.modelToSketchSpace(p(sign*cx,y_bottom,cz)),radius/10)
+        tool = extrude(comp,sk.profiles.item(0),gripD/2-y_bottom,'WOO_finger_'+label)
+        sk.isVisible = False
+        handle = cut(comp,handle,tool)
+    return handle,{'enabled':True,'diameter_mm':wooFingerD,'depth_from_seat_mm':wooFingerDepth,
+                   'bottom_y_mm':y_bottom,'centers_xz_mm':[[-cx,cz],[cx,cz]]}
+
+
 # Общий расчёт выемки для построения и проверки просвета под полочкой.
 def finger_scoop_geometry():
     """Размеры единого эллипсоида: широкий вход с концом, скрытым под крышкой."""
@@ -548,7 +597,7 @@ def finger_scoop_geometry():
 
 # Встроенные ограничения размеров сечения, полости, болтов и креплений.
 # Выполняются при запуске; это не испытание готовой детали.
-def validate(info, vertices):
+def validate(info, vertices, radii):
     for name in ['boltSpacing','handleTop','gripH','gripD','baseTrimMargin',
                  'boltD','headPocketD','shoulder','wooHalfDepth','snapLength','snapThickness']:
         check(globals()[name] > 0, name+' must be positive.')
@@ -673,6 +722,19 @@ def validate(info, vertices):
                   'Fit sample must include the whole beam and root.')
     check(abs(info['side_chord_mm']-wooSideChordReference) < 0.04,'WOO side chord differs from drawing; verify inputs.')
     xmax = max(abs(x) for x,z in vertices)+wooFitClearance
+    if enableWooFingerRecesses:
+        cavity_curves = rounded_polygon(offset_polygon(vertices,wooFitClearance),
+                                        [r+wooFitClearance for r in radii])
+        finger_x,finger_z,finger_radius,finger_bottom = woo_finger_recess_geometry(cavity_curves)
+        check(finger_x+finger_radius+wooFingerSeatMargin <
+              xmax+lidWingLength-lidWingR,
+              'Выемки доходят до скруглённых торцов крышки: уменьшите wooFingerD.')
+        if enableSnapFits:
+            nearest_lock_x = min(xmax+mechanismKeepout+snapRootLength+snapLength-snapHookLength-snapClearance,
+                                 xmax+lidWingLength+wooFitClearance+lidBorder-tongueRootLength-
+                                 tongueClearance-lidTiltClearance)
+            check(finger_x+finger_radius+minimumWall < nearest_lock_x,
+                  'Выемки подходят к гнёздам креплений: уменьшите wooFingerD.')
     check(xmax+lidWingLength+lidGap+minimumWall < tangentx,
           'Bolt spacing too short: cover wings reach bends. Increase boltSpacing or reduce wings.')
     check(xmax+lidWingLength+wooFitClearance+lidBorder-pryUnderlap+pryLength+minimumWall
@@ -981,7 +1043,7 @@ def run(context):
     try:
         # 1. Рассчитать профиль полости и проверить допустимость настроек.
         vertices,radii,info = woo_geometry()
-        validate(info,vertices)
+        validate(info,vertices,radii)
         report['woo_profile'] = info
         report['settings'] = {k:v for k,v in globals().items() if not k.startswith('_') and isinstance(v,(int,float,bool,str))}
         report['settings'].pop('folder',None)
@@ -1030,6 +1092,13 @@ def run(context):
         seat = make_cover_outline(comp,vertices,radii,wooFitClearance+lidBorder+lidGap,
                                   seat_y,gripD,wing_start,wing_end,zc,'Cover_seat')
         handle = cut(comp,handle,seat)
+        report['woo_finger_recesses'] = {'enabled':False}
+        if enableWooFingerRecesses:
+            stage = 'WOO finger recesses'
+            # Меняем только ручку: крышка сохраняет контур и закрывает обе выемки.
+            handle,recess_info = make_woo_finger_recesses(comp,handle,cavity_curves)
+            report['woo_finger_recesses'] = recess_info
+        stage = 'WOO cover'
         # Cover starts deeper at the rim; WOO envelope is subtracted below.
         # 6. Заготовка крышки: обрезать по исходной поверхности ручки,
         # затем убрать с обратной стороны материал из полезного объёма датчика.
