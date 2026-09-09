@@ -17,7 +17,7 @@ API хранит координаты в см: перевод выполняет
 """
 
 # ==================== SETTINGS / НАСТРОЙКИ ====================
-scriptVersion = '1.0.34'       # Версия повышается при каждом обновлении.
+scriptVersion = '1.0.35'       # Версия повышается при каждом обновлении.
 fitGap = 0.1  # Общий посадочный зазор НА СТОРОНУ, мм.
 boltSpacing = 180.0  # Межцентровое расстояние крепёжных болтов по X.
 handleTop = 72.0  # Полная высота от поверхности доски.
@@ -54,12 +54,13 @@ wooSideR = 1.0  # Радиус боковых углов исходного пр
 wooBottomR = 0.5  # Радиус нижних углов исходного профиля.
 wooSideChordReference = 0.960  # Справочная хорда из чертежа для сопоставления с отчётом.
 wooHalfDepth = 11.0  # Половина полезной глубины: полость от Y=-11 до Y=+11.
-wooProfileOffset = 3  # Расширение исходного контура наружу в плоскости XZ.
+wooProfileOffset = 1  # Расширение исходного контура наружу в плоскости XZ.
 wooZOffset = 0.0  # Сдвиг полости по Z относительно центра перекладины.
 wooFitClearance = 0.0  # Дополнительный припуск к профилю ПОСЛЕ wooProfileOffset.
 enableWooFingerRecesses = True  # Две полукруглые выемки для извлечения датчика; False отключает.
 wooFingerD = 10.0  # Диаметр выемок в плоскости XZ, мм.
-wooFingerDepth = 8.0  # Глубина по -Y от плоскости посадки крышки, а не от наружной поверхности.
+wooFingerDepth = 4.0  # Глубина по -Y от плоскости посадки крышки, а не от наружной поверхности.
+wooFingerBowlRatio = 0.75  # Форма плавного эллипсоидального дна; значение строго между 0 и 1.
 wooFingerSeatMargin = 0.2  # Минимальный отступ выемок от верхнего/нижнего края бокового крыла крышки.
 enableDrainHole = True  # Слив из камеры WOO вниз через хват; False отключает отверстие.
 drainHoleD = 1.5  # Диаметр сливного отверстия, мм; центр X=0, Y=0, направление вдоль Z.
@@ -534,6 +535,7 @@ def woo_finger_recess_geometry(cavity_curves):
     check(radius > 0 and wooFingerSeatMargin > 0,'Диаметр выемок и отступ от края должны быть положительными.')
     check(0 < wooFingerDepth < 2*wooHalfDepth-lidSeatDepth-minimumWall,
           'Выемки слишком глубокие: оставьте опору датчика у задней части камеры.')
+    check(0 < wooFingerBowlRatio < 1,'Коэффициент формы дна wooFingerBowlRatio должен быть между 0 и 1.')
     # У правого бока выбираем самый длинный наклонный прямой участок.
     # Верхняя/нижняя горизонтали и короткий нижний скос сюда не попадают.
     sides = [c for c in cavity_curves if len(c) == 2 and min(c[0][0],c[1][0]) > 0
@@ -558,18 +560,30 @@ def woo_finger_recess_geometry(cavity_curves):
     return center_x,center_z,radius,y_bottom
 
 
-# Вырезать круги вдоль Y: внутри камеры половина каждого круга уже пустая,
-# поэтому в боковой стенке остаётся ровно полукруг для захвата датчика.
+# Плавные чаши по тому же принципу, что и ложбинка для снятия крышки.
+# На посадочной плоскости остаётся полукруг, а глубина возрастает к датчику.
 def make_woo_finger_recesses(comp,handle,cavity_curves):
     cx,cz,radius,y_bottom = woo_finger_recess_geometry(cavity_curves)
+    seat_y = wooHalfDepth-lidSeatDepth
+    # Подбираем эллипсоид так, чтобы его сечение на Y=seat_y имело точно
+    # диаметр wooFingerD, а самая глубокая точка находилась на y_bottom.
+    lateral_radius = radius/math.sqrt(1-wooFingerBowlRatio**2)
+    depth_radius = wooFingerDepth/(1-wooFingerBowlRatio)
+    center_y = seat_y+depth_radius*wooFingerBowlRatio
     for sign,label in [(-1,'Left'),(1,'Right')]:
-        sk = sketch_plane(comp,(0,y_bottom,0),(0,1,0),'WOO_finger_'+label)
-        sk.sketchCurves.sketchCircles.addByCenterRadius(
-            sk.modelToSketchSpace(p(sign*cx,y_bottom,cz)),radius/10)
-        tool = extrude(comp,sk.profiles.item(0),gripD/2-y_bottom,'WOO_finger_'+label)
-        sk.isVisible = False
+        tool = ellipsoid_body(comp,(sign*cx,center_y,cz),lateral_radius,depth_radius,
+                              lateral_radius,'WOO_finger_bowl_'+label)
+        # Верхнюю часть эллипсоида отсекаем на посадке: выше неё круг начал бы
+        # расширяться. Так выемка остаётся в прежнем контуре под крышкой.
+        limit = box(comp,sign*cx-lateral_radius-geometryTolerance,
+                    sign*cx+lateral_radius+geometryTolerance,
+                    y_bottom-geometryTolerance,seat_y,
+                    cz-lateral_radius-geometryTolerance,cz+lateral_radius+geometryTolerance,
+                    'WOO_finger_bowl_limit_'+label)
+        tool = intersect(comp,tool,limit)
         handle = cut(comp,handle,tool)
     return handle,{'enabled':True,'diameter_mm':wooFingerD,'depth_from_seat_mm':wooFingerDepth,
+                   'shape':'ellipsoidal bowl','bowl_ratio':wooFingerBowlRatio,
                    'bottom_y_mm':y_bottom,'centers_xz_mm':[[-cx,cz],[cx,cz]]}
 
 
